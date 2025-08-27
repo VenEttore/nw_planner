@@ -3,6 +3,7 @@
   import { darkMode, notifications } from '../stores/ui'
   import api from '../services/api.js'
   import ServerModal from '../components/ServerModal.svelte'
+  import StatusModal from '../components/StatusModal.svelte'
   
   let loading = true
   let darkModeEnabled = false
@@ -24,6 +25,17 @@
   let serverLoading = true
   let serverStats = { total: 0, active: 0, inactive: 0 }
   let retrieveLoading = false
+
+  // Participation statuses
+  let statuses = []
+  let statusLoading = true
+  let showStatusModal = false
+  let editingStatus = null
+  async function loadStatuses(){
+    statusLoading = true
+    try { statuses = await api.getParticipationStatuses() } catch { statuses = [] }
+    finally { statusLoading = false }
+  }
   
   
   
@@ -44,6 +56,7 @@
     // Load servers
     await loadServers()
     await loadServerStats()
+    await loadStatuses()
     
     return () => {
       unsubscribeDark()
@@ -206,6 +219,22 @@
       await showAlert('Failed to clear servers: ' + (error?.message || error), 'Error', 'OK')
     }
   }
+
+  // Participation status handlers
+  function openStatusModal(s=null){ editingStatus = s; showStatusModal = true }
+  function closeStatusModal(){ showStatusModal = false; editingStatus = null }
+  async function saveStatus(e){
+    const data = e.detail
+    if (editingStatus) await api.updateParticipationStatus(editingStatus.id, data)
+    else await api.createParticipationStatus(data)
+    await loadStatuses(); closeStatusModal()
+  }
+  async function deleteStatus(s){
+    const { showConfirm } = await import('../stores/dialog.js')
+    const ok = await showConfirm(`Delete status "${s.name}"?`, 'Delete Status', 'Delete', 'Cancel')
+    if (!ok) return
+    try { await api.deleteParticipationStatus(s.id, null); await loadStatuses() } catch (e) { console.error('Delete status failed', e) }
+  }
 </script>
 
 <div class="max-w-7xl mx-auto">
@@ -365,6 +394,36 @@
         {/if}
       </div>
       
+      <!-- Participation Statuses -->
+      <div class="card">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Participation Statuses</h2>
+          <button on:click={() => openStatusModal()} class="px-3 py-2 bg-nw-blue text-white rounded-md hover:bg-nw-blue-dark">New Status</button>
+        </div>
+        {#if statusLoading}
+          <div class="flex items-center justify-center h-24"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-nw-blue"></div></div>
+        {:else if statuses.length === 0}
+          <div class="text-gray-500 dark:text-gray-400">No custom statuses. Defaults are seeded automatically.</div>
+        {:else}
+          <div class="space-y-2">
+            {#each statuses as s}
+              <div class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                <div class="flex items-center gap-3">
+                  <span class={`px-2 py-0.5 text-xs rounded ${s.color_bg} ${s.color_text}`}>{s.name}</span>
+                  {#if s.is_absent}
+                    <span class="text-[10px] text-gray-500">(Absent)</span>
+                  {/if}
+                </div>
+                <div class="flex items-center gap-2">
+                  <button class="btn-secondary text-xs" on:click={() => openStatusModal(s)}>Edit</button>
+                  <button class="btn-danger text-xs" on:click={() => deleteStatus(s)} disabled={s.is_default}>Delete</button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
       <!-- Data Management -->
       <div class="card">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Data Management</h2>
@@ -416,6 +475,13 @@
   isOpen={showServerModal}
   on:close={closeServerModal}
   on:saved={handleServerSaved}
+/>
+
+<StatusModal
+  isOpen={showStatusModal}
+  status={editingStatus}
+  on:cancel={closeStatusModal}
+  on:save={saveStatus}
 />
 </div>
 
