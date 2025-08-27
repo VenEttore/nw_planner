@@ -9,6 +9,7 @@
   let events = []
   let characters = []
   let templates = []
+  let statuses = []
   let filterType = 'all'
   let filterCharacter = 'all'
   let showModal = false
@@ -32,15 +33,17 @@
     loading = true
     try {
       // Load events and characters
-      const [eventsData, charactersData, templatesData] = await Promise.all([
+      const [eventsData, charactersData, templatesData, statusData] = await Promise.all([
         api.getEvents(),
         api.getActiveCharacters(),
-        api.getEventTemplates()
+        api.getEventTemplates(),
+        api.getParticipationStatuses()
       ])
       
       events = eventsData
       characters = charactersData
       templates = templatesData
+      statuses = statusData
     } catch (error) {
       console.error('Error loading events data:', error)
     } finally {
@@ -131,6 +134,13 @@
       'Custom': 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-200'
     }
     return colors[eventType] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+  }
+
+  function statusClass(name) {
+    const s = (statuses || []).find(x => x.name === name)
+    if (!s) return 'bg-gray-50 border-gray-200 text-gray-800'
+    // border kept neutral to avoid requiring a border color per status
+    return `${s.color_bg} border-gray-200 ${s.color_text}`
   }
 </script>
 
@@ -233,17 +243,11 @@
                 <select 
                   value={event.participation_status || 'Signed Up'}
                   on:change={(e) => updateRsvpStatus(event.id, e.target.value)}
-                  class="text-xs pr-6 pl-2 py-1 rounded border appearance-none bg-[length:12px_12px] bg-no-repeat bg-right-2 bg-[url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 20 20\' fill=\'none\' stroke=\'%23666\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 8 10 12 14 8\'/></svg>')] {
-                    event.participation_status === 'Confirmed' ? 'bg-green-50 border-green-200 text-green-800' :
-                    event.participation_status === 'Signed Up' ? 'bg-blue-50 border-blue-200 text-blue-800' :
-                    event.participation_status === 'Tentative' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
-                    'bg-gray-50 border-gray-200 text-gray-800'
-                  }"
+                  class={`text-xs pr-6 pl-2 py-1 rounded border appearance-none bg-[length:12px_12px] bg-no-repeat bg-right-2 bg-[url('data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'16\\' height=\\'16\\' viewBox=\\'0 0 20 20\\' fill=\\'none\\' stroke=\\'%23666\\' stroke-width=\\'2\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'><polyline points=\\'6 8 10 12 14 8\\'/></svg>')] ${statusClass(event.participation_status)}`}
                 >
-                  <option value="Signed Up">Signed Up</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Tentative">Tentative</option>
-                  <option value="Absent">Absent</option>
+                  {#each statuses as s}
+                    <option value={s.name}>{s.name}</option>
+                  {/each}
                 </select>
                 
                 <!-- Action Buttons -->

@@ -126,7 +126,7 @@ class DatabaseService {
                 event_time TIMESTAMP NOT NULL,
                 timezone TEXT NOT NULL,
                 character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
-                participation_status TEXT CHECK(participation_status IN ('Signed Up', 'Confirmed', 'Absent', 'Tentative')) DEFAULT 'Signed Up',
+                participation_status TEXT DEFAULT 'Signed Up',
                 location TEXT,
                 recurring_pattern TEXT,
                 notification_enabled BOOLEAN DEFAULT 1,
@@ -143,7 +143,7 @@ class DatabaseService {
                 event_type TEXT,
                 description TEXT,
                 location TEXT,
-                participation_status TEXT CHECK(participation_status IN ('Signed Up','Confirmed','Absent','Tentative')) DEFAULT 'Signed Up',
+                participation_status TEXT DEFAULT 'Signed Up',
                 notification_enabled BOOLEAN DEFAULT 1,
                 notification_minutes INTEGER DEFAULT 30,
                 time_strategy TEXT CHECK(time_strategy IN ('relative','fixed')) DEFAULT NULL,
@@ -180,9 +180,110 @@ class DatabaseService {
         this.migrateTasksTableForOneTime()
         this.migrateEventTemplatesAddPayload()
         this.migrateEventTemplatesPruneLegacy()
+        this.migrateParticipationStatuses()
+        this.migrateDropStatusChecks()
 
         // Note: Default tasks are no longer automatically inserted to keep the app clean
         // Users can manually add tasks or import data if needed
+    }
+
+    // Create participation_statuses table and seed defaults
+    migrateParticipationStatuses() {
+        try {
+            const exists = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='participation_statuses'").get()
+            if (exists) return
+            this.db.exec(`
+                CREATE TABLE participation_statuses (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    slug TEXT NOT NULL UNIQUE,
+                    color_bg TEXT NOT NULL,
+                    color_text TEXT NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    is_absent BOOLEAN NOT NULL DEFAULT 0,
+                    is_default BOOLEAN NOT NULL DEFAULT 0
+                );
+                CREATE INDEX idx_participation_statuses_sort ON participation_statuses(sort_order);
+            `)
+            const seed = this.db.prepare('INSERT INTO participation_statuses (name, slug, color_bg, color_text, sort_order, is_absent, is_default) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            const defaults = [
+                ['Signed Up','signed_up','bg-blue-50','text-blue-800',10,0,1],
+                ['Confirmed','confirmed','bg-green-50','text-green-800',20,0,1],
+                ['Tentative','tentative','bg-yellow-50','text-yellow-800',30,0,1],
+                ['Absent','absent','bg-gray-50','text-gray-800',40,1,1]
+            ]
+            const tx = this.db.transaction(()=>{ defaults.forEach(d => seed.run(...d)) })
+            tx()
+        } catch (e) {
+            console.warn('participation_statuses migration skipped:', e)
+        }
+    }
+
+    // Drop legacy CHECK constraint on events/event_templates participation_status by table rebuild if needed
+    migrateDropStatusChecks() {
+        try {
+            const rowEvents = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='events'").get()
+            const sqlEvents = rowEvents?.sql || ''
+            if (sqlEvents.includes('CHECK(participation_status')) {
+                this.db.exec('PRAGMA foreign_keys=OFF;')
+                this.db.exec(`
+                    BEGIN TRANSACTION;
+                    CREATE TABLE events_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        description TEXT,
+                        event_type TEXT NOT NULL,
+                        server_name TEXT,
+                        event_time TIMESTAMP NOT NULL,
+                        timezone TEXT NOT NULL,
+                        character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+                        participation_status TEXT DEFAULT 'Signed Up',
+                        location TEXT,
+                        recurring_pattern TEXT,
+                        notification_enabled BOOLEAN DEFAULT 1,
+                        notification_minutes INTEGER DEFAULT 30,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    INSERT INTO events_new SELECT id,name,description,event_type,server_name,event_time,timezone,character_id,participation_status,location,recurring_pattern,notification_enabled,notification_minutes,created_at FROM events;
+                    DROP TABLE events;
+                    ALTER TABLE events_new RENAME TO events;
+                    COMMIT;
+                `)
+                this.db.exec('PRAGMA foreign_keys=ON;')
+            }
+
+            const rowTpl = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='event_templates'").get()
+            const sqlTpl = rowTpl?.sql || ''
+            if (sqlTpl.includes('CHECK(participation_status')) {
+                this.db.exec('PRAGMA foreign_keys=OFF;')
+                this.db.exec(`
+                    BEGIN TRANSACTION;
+                    CREATE TABLE event_templates_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE,
+                        event_type TEXT,
+                        description TEXT,
+                        location TEXT,
+                        participation_status TEXT DEFAULT 'Signed Up',
+                        notification_enabled BOOLEAN DEFAULT 1,
+                        notification_minutes INTEGER DEFAULT 30,
+                        time_strategy TEXT CHECK(time_strategy IN ('relative','fixed')) DEFAULT NULL,
+                        time_params TEXT,
+                        payload_json TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    INSERT INTO event_templates_new SELECT id,name,event_type,description,location,participation_status,notification_enabled,notification_minutes,time_strategy,time_params,payload_json,created_at,updated_at FROM event_templates;
+                    DROP TABLE event_templates;
+                    ALTER TABLE event_templates_new RENAME TO event_templates;
+                    COMMIT;
+                `)
+                this.db.exec('PRAGMA foreign_keys=ON;')
+            }
+        } catch (e) {
+            try { this.db.exec('PRAGMA foreign_keys=ON;') } catch(_) {}
+            console.warn('Drop status CHECK migration skipped:', e)
+        }
     }
 
     migrateEventTemplatesAddPayload() {

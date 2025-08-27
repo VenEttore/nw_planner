@@ -1005,6 +1005,62 @@ Testing checklist (Tasks)
 - Verify weekly reset tokens match server-local Tuesday 05:00 periods across timezones/DST.
 - When the weekly reset occurs, assigned weekly tasks for affected characters re-render as incomplete without manual refresh.
 
+### 9.12 Events — Participation status customization
+
+Motivation
+- Allow users to define their own participation statuses and colors, while preserving existing events and current UX features (e.g., “Hide Absent”).
+
+Data model (new table)
+- participation_statuses
+  - id INTEGER PRIMARY KEY AUTOINCREMENT
+  - name TEXT NOT NULL UNIQUE (e.g., "Signed Up", "Confirmed", "Tentative", "Absent")
+  - slug TEXT NOT NULL UNIQUE (stable key, e.g., signed_up)
+  - color_bg TEXT NOT NULL (Tailwind class for bg chip, e.g., bg-blue-50)
+  - color_text TEXT NOT NULL (Tailwind class for text, e.g., text-blue-800)
+  - sort_order INTEGER NOT NULL DEFAULT 0
+  - is_absent BOOLEAN NOT NULL DEFAULT 0 (drives "hide absent" behavior)
+  - is_default BOOLEAN NOT NULL DEFAULT 0 (prevents deletion without replacement)
+
+Backward compatibility strategy
+- Keep `events.participation_status` as free TEXT for resilience (no rigid CHECK list).
+- Migration drops any CHECK constraint from `events.participation_status` by rebuilding the table and preserves all rows.
+- Seed four defaults in `participation_statuses`: Signed Up, Confirmed, Tentative, Absent, matching current colors and marking Absent with `is_absent=1`.
+- When rendering, map event.status → status row by `name`. If not found, display a neutral chip (`bg-gray-50 text-gray-800`) and do not hide unless `name === 'Absent'` as a last‑resort fallback.
+
+Migrations
+- Create `participation_statuses` (schema above) with indexes on `slug` and `sort_order`.
+- Rebuild `events` to remove the legacy CHECK constraint; columns unchanged.
+- Seed defaults if table empty.
+
+Renderer and services
+- New `participationStatusService` (renderer-side thin wrapper over main): CRUD, list, reorder.
+- Electron main: IPC handlers `status:getAll|create|update|delete|reorder` backed by DB service.
+- Events UI (Events page + EventModal):
+  - Replace hard-coded status options with data-driven list sorted by `sort_order`, falling back to seeded defaults if the table is empty.
+  - Chip/select coloring uses `color_bg` + `color_text` from the chosen status.
+- Header and Dashboard filters: replace string check (`=== 'Absent'`) with `is_absent` lookup; retain string fallback for legacy rows where the table is missing or status not found.
+
+Settings UI
+- New Settings section: “Participation Statuses”.
+  - List with Name, Color preview, Absent flag, and drag handle for order.
+  - Add/Edit modal: edit Name, choose colors from a curated palette or free text Tailwind classes, toggle Absent, and set default flag.
+  - Delete flow: if a status is in use by events, require choosing a replacement status; apply a DB-side update to remap affected events’ `participation_status` names.
+
+Styling guidance
+- Provide a small curated palette mapping to Tailwind semantic pairs (e.g., blue/green/yellow/gray/red); allow advanced users to paste classes.
+- Ensure dark-mode contrast remains AA‑safe for text on chip backgrounds.
+
+Edge cases
+- Unknown status on an event (possibly from import): render neutral chip; do not error.
+- Deleting a status in use without replacement selection: block with dialog.
+- Renaming a status: existing events continue to match by name (name is canonical for events); warn if rename collides with an existing status.
+
+Testing plan
+- Migration: after upgrade, no events lost; four defaults seeded; CHECK constraint removed.
+- Settings: create/edit/delete/reorder statuses; Absent toggle changes header/dashboard visibility behavior; colors reflect immediately.
+- Events: selects show custom statuses in order; chips reflect chosen colors; editing and saving preserves status text.
+- Deletion with replacement: events previously using deleted status now reference replacement name; UI chips/filters update.
+
 ## 10. Comprehensive Testing Protocol
 
 ### 10.1 Pre-Test Setup
