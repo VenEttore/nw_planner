@@ -13,6 +13,7 @@
   let loading = true
   let events = []
   let characters = []
+  let statuses = []
   let selectedCharacterIds = []
   let characterSearch = ''
   let showAll = true
@@ -77,13 +78,15 @@
   async function loadData() {
     loading = true
     try {
-      const [eventsData, charactersData] = await Promise.all([
+      const [eventsData, charactersData, statusData] = await Promise.all([
         api.getEvents(),
-        api.getActiveCharacters()
+        api.getActiveCharacters(),
+        api.getParticipationStatuses()
       ])
       
       events = eventsData
       characters = charactersData
+      statuses = Array.isArray(statusData) ? statusData : []
       
       // Set default to "All"
       if (selectedCharacterIds.length === 0 && characters.length > 0) {
@@ -251,13 +254,18 @@
     return `event-${eventType.toLowerCase().replace(/\s+/g, '-')} status-${status.toLowerCase().replace(/\s+/g, '-')}`
   }
   
-  function handleEventClick(info) {
+  async function handleEventClick(info) {
     const event = info.event
     
     // Don't edit reset markers
     if (event.id.includes('reset')) return
     
-    editingEvent = event.extendedProps.originalEvent
+    try {
+      const fresh = await api.getEventById(event.id)
+      editingEvent = fresh || event.extendedProps.originalEvent
+    } catch {
+      editingEvent = event.extendedProps.originalEvent
+    }
     isCreating = false
     showEventModal = true
   }
@@ -494,6 +502,7 @@
     bind:show={showEventModal}
     {editingEvent}
     {characters}
+    {statuses}
     {isCreating}
     on:save={(e) => handleEventSave(e.detail)}
     on:cancel={handleEventCancel}

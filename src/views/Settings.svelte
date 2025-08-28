@@ -25,6 +25,14 @@
   let serverStats = { total: 0, active: 0, inactive: 0 }
   let retrieveLoading = false
   
+  // Participation statuses management
+  let statuses = []
+  let statusLoading = true
+  let editingStatus = null
+  let showStatusEditor = false
+  let statusForm = { name: '', slug: '', color_bg: 'bg-gray-50 border-gray-200', color_text: 'text-gray-800', sort_order: 0, is_absent: false }
+  function resetStatusForm() { statusForm = { name: '', slug: '', color_bg: 'bg-gray-50 border-gray-200', color_text: 'text-gray-800', sort_order: 0, is_absent: false } }
+  
   
   
   onMount(async () => {
@@ -44,6 +52,7 @@
     // Load servers
     await loadServers()
     await loadServerStats()
+    await loadStatuses()
     
     return () => {
       unsubscribeDark()
@@ -53,6 +62,31 @@
   
   function toggleDarkMode() {
     darkMode.update(value => !value)
+  }
+  async function loadStatuses() {
+    statusLoading = true
+    try { statuses = await api.getParticipationStatuses() } catch { statuses = [] }
+    finally { statusLoading = false }
+  }
+  async function saveStatus() {
+    try {
+      const payload = { ...statusForm, is_absent: !!statusForm.is_absent, sort_order: parseInt(statusForm.sort_order||0) }
+      if (editingStatus) await api.updateParticipationStatus(editingStatus.id, payload)
+      else await api.createParticipationStatus(payload)
+      showStatusEditor = false; editingStatus = null; resetStatusForm(); await loadStatuses()
+    } catch (e) { console.error('Save status failed:', e) }
+  }
+  function openCreateStatus() { editingStatus = null; resetStatusForm(); showStatusEditor = true }
+  function openEditStatus(s) { editingStatus = s; statusForm = { name: s.name, slug: s.slug, color_bg: s.color_bg, color_text: s.color_text, sort_order: s.sort_order, is_absent: !!s.is_absent }; showStatusEditor = true }
+  async function deleteStatus(s) {
+    const { showConfirm } = await import('../stores/dialog.js')
+    const ok = await showConfirm(`Delete status "${s.name}"? You may remap events using this status.`, 'Delete Status', 'Delete', 'Cancel')
+    if (!ok) return
+    try {
+      // Simple delete without remap for now
+      await api.deleteParticipationStatus(s.id, null)
+      await loadStatuses()
+    } catch (e) { console.error('Delete status failed:', e) }
   }
   
   function updateNotificationSetting(setting, value) {
@@ -365,6 +399,43 @@
         {/if}
       </div>
       
+      <!-- Participation Statuses -->
+      <div class="card">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Participation Statuses</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Customize status names and appearance. Absent flag is used by dashboard filtering.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button on:click={openCreateStatus} class="px-4 py-2 bg-nw-blue text-white rounded-md hover:bg-nw-blue-dark transition-colors">New Status</button>
+          </div>
+        </div>
+        {#if statusLoading}
+          <div class="flex items-center justify-center h-24">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-nw-blue"></div>
+          </div>
+        {:else if statuses.length === 0}
+          <div class="text-sm text-gray-600 dark:text-gray-400">No statuses yet.</div>
+        {:else}
+          <div class="space-y-2">
+            {#each statuses as s}
+              <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div class="flex items-center gap-3">
+                  <span class={`px-2 py-0.5 rounded border text-xs ${s.color_bg} ${s.color_text}`}>{s.name}</span>
+                  {#if s.is_absent}
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200">Absent</span>
+                  {/if}
+                </div>
+                <div class="flex items-center gap-2">
+                  <button on:click={() => openEditStatus(s)} class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">Edit</button>
+                  <button on:click={() => deleteStatus(s)} class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">Delete</button>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      
       <!-- Data Management -->
       <div class="card">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Data Management</h2>
@@ -418,6 +489,66 @@
   on:saved={handleServerSaved}
 />
 </div>
+
+<!-- Status Editor Modal -->
+{#if showStatusEditor}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+    <button class="absolute inset-0 w-full h-full cursor-default" aria-label="Close" on:click={() => { showStatusEditor=false; editingStatus=null }} on:keydown={(e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); showStatusEditor=false; editingStatus=null } }}></button>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full" role="document" on:click|stopPropagation>
+      <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{editingStatus ? 'Edit Status' : 'New Status'}</h3>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label for="status_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+          <input id="status_name" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={statusForm.name} placeholder="e.g., Confirmed" />
+        </div>
+        <div>
+          <label for="status_slug" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Slug</label>
+          <input id="status_slug" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={statusForm.slug} placeholder="e.g., confirmed" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="status_bg" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Background</label>
+            <select id="status_bg" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={statusForm.color_bg}>
+              <option value="bg-blue-50 border-blue-200">Blue</option>
+              <option value="bg-green-50 border-green-200">Green</option>
+              <option value="bg-yellow-50 border-yellow-200">Yellow</option>
+              <option value="bg-gray-50 border-gray-200">Gray</option>
+              <option value="bg-red-50 border-red-200">Red</option>
+              <option value="bg-purple-50 border-purple-200">Purple</option>
+            </select>
+          </div>
+          <div>
+            <label for="status_text" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Text</label>
+            <select id="status_text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={statusForm.color_text}>
+              <option value="text-blue-800">Blue</option>
+              <option value="text-green-800">Green</option>
+              <option value="text-yellow-800">Yellow</option>
+              <option value="text-gray-800">Gray</option>
+              <option value="text-red-800">Red</option>
+              <option value="text-purple-800">Purple</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="status_order" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sort Order</label>
+            <input id="status_order" type="number" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={statusForm.sort_order} />
+          </div>
+          <div class="flex items-center gap-2 mt-6">
+            <input id="absent" type="checkbox" bind:checked={statusForm.is_absent} class="w-4 h-4 text-nw-blue bg-gray-100 border-gray-300 rounded focus:ring-nw-blue focus:ring-2 dark:bg-gray-700 dark:border-gray-600" />
+            <label for="absent" class="text-sm text-gray-700 dark:text-gray-300">Mark as Absent</label>
+          </div>
+        </div>
+      </div>
+      <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
+        <button on:click={() => { showStatusEditor=false; editingStatus=null }} class="px-4 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300">Cancel</button>
+        <button on:click={saveStatus} class="px-4 py-2 text-sm bg-nw-blue text-white rounded-md hover:bg-nw-blue-dark">Save</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- Delete Confirmation Modal -->
 {#if showDeleteConfirmation}
