@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import api from '../services/api.js'
   import EventModal from '../components/EventModal.svelte'
+  import StatusSelect from '../components/StatusSelect.svelte'
   import TemplateManager from '../components/TemplateManager.svelte'
   import { currentView } from '../stores/ui'
   
@@ -252,20 +253,12 @@
               <!-- Actions -->
               <div class="flex items-center gap-2 ml-2">
                 <!-- RSVP Status Dropdown -->
-                <select 
+                <StatusSelect
                   value={event.participation_status || 'Signed Up'}
-                  on:change={(e) => updateRsvpStatus(event.id, e.target.value)}
-                  class="text-xs pr-6 pl-2 py-1 rounded border appearance-none bg-[length:12px_12px] bg-no-repeat bg-right-2 bg-[url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 20 20\' fill=\'none\' stroke=\'%23666\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 8 10 12 14 8\'/></svg>')] bg-gray-50 border-gray-200 text-gray-800"
-                >
-                  {#each (statuses.length ? statuses : [
-                    { name: 'Signed Up' },
-                    { name: 'Confirmed' },
-                    { name: 'Tentative' },
-                    { name: 'Absent' }
-                  ]) as s}
-                    <option value={s.name}>{s.name}</option>
-                  {/each}
-                </select>
+                  {statuses}
+                  selectClass="text-xs"
+                  on:change={(e)=> updateRsvpStatus(event.id, e.detail.value)}
+                />
                 
                 <!-- Action Buttons -->
                 <div class="flex gap-1">

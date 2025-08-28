@@ -3,6 +3,7 @@
   import { currentView } from '../stores/ui'
   import api from '../services/api.js'
   import EventModal from '../components/EventModal.svelte'
+  import StatusSelect from '../components/StatusSelect.svelte'
   
   let loading = true
   let characters = []
@@ -390,22 +391,13 @@
                       {/if}
                     </div>
                     <div class="ml-3 flex items-center gap-2">
-                      <span class={`w-2 h-2 rounded-full ${rsvpDotClass(event.participation_status || 'Signed Up')}`} aria-hidden="true"></span>
-                      <select 
-                        on:click|stopPropagation
+                      <StatusSelect
+                        stopClickPropagation={true}
                         value={event.participation_status || 'Signed Up'}
-                        on:change={(e) => updateRsvpStatus(event.id, e.target.value)}
-                        class="text-[10px] px-1.5 py-0.5 rounded border bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"
-                      >
-                        {#each (statuses.length ? statuses : [
-                          { name: 'Signed Up' },
-                          { name: 'Confirmed' },
-                          { name: 'Tentative' },
-                          { name: 'Absent' }
-                        ]) as s}
-                          <option value={s.name}>{s.name}</option>
-                        {/each}
-                      </select>
+                        {statuses}
+                        selectClass="text-[10px]"
+                        on:change={(e)=> updateRsvpStatus(event.id, e.detail.value)}
+                      />
                     </div>
                   </div>
                 </div>
