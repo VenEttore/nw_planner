@@ -124,9 +124,12 @@
     }
   }
 
+  let rsvpPending = {}
   async function updateRsvpStatus(eventId, newStatus) {
     try {
-      await api.updateEventRsvp(eventId, newStatus)
+      const p = api.updateEventRsvp(eventId, newStatus)
+      rsvpPending[eventId] = p; rsvpPending = { ...rsvpPending }
+      await p
       // Patch the single event to avoid full reload/race
       try {
         const fresh = await api.getEventById(eventId)
@@ -139,10 +142,11 @@
       } catch {}
     } catch (error) {
       console.error('Error updating RSVP:', error)
-    }
+    } finally { delete rsvpPending[eventId]; rsvpPending = { ...rsvpPending } }
   }
 
   async function openEditEvent(ev) {
+    try { if (rsvpPending[ev.id]) await rsvpPending[ev.id] } catch {}
     try { editingEvent = await api.getEventById(ev.id) || ev } catch { editingEvent = ev }
     showEventModal = true
   }

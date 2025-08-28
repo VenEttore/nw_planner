@@ -53,13 +53,19 @@
     try { templates = await api.getEventTemplates() } catch { /* noop */ }
   }
   
+  let rsvpPending = {}
   async function updateRsvpStatus(eventId, newStatus) {
     try {
-      await api.updateEventRsvp(eventId, newStatus)
+      const p = api.updateEventRsvp(eventId, newStatus)
+      rsvpPending[eventId] = p; rsvpPending = { ...rsvpPending }
+      await p
       // Reconcile with fresh row to avoid drift
       try { const fresh = await api.getEventById(eventId); if (fresh) events = (events || []).map(e => e.id === eventId ? fresh : e) } catch {}
     } catch (error) {
       console.error('Error updating RSVP:', error)
+    }
+    finally {
+      delete rsvpPending[eventId]; rsvpPending = { ...rsvpPending }
     }
   }
   
@@ -82,8 +88,9 @@
     initialTemplateId = tplId
     showModal = true
   }
-  function openEdit(ev) {
-    editingEvent = ev
+  async function openEdit(ev) {
+    try { if (rsvpPending[ev.id]) await rsvpPending[ev.id] } catch {}
+    try { editingEvent = await api.getEventById(ev.id) || ev } catch { editingEvent = ev }
     showModal = true
   }
   async function handleSave(e) {
