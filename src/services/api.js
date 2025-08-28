@@ -859,6 +859,36 @@ class ApiService {
         return existing.find(e => e.id === id) || null
     }
 
+    // Participation statuses API
+    async getParticipationStatuses() {
+        await this.init()
+        if (this.isElectron) {
+            return await this.electronAPI.statuses.getAll()
+        }
+        // web mode fallback: mirror seeded defaults
+        return [
+            { id: 1, name: 'Signed Up', slug: 'signed-up', color_bg: 'bg-blue-50 border-blue-200', color_text: 'text-blue-800', sort_order: 10, is_absent: 0 },
+            { id: 2, name: 'Confirmed', slug: 'confirmed', color_bg: 'bg-green-50 border-green-200', color_text: 'text-green-800', sort_order: 20, is_absent: 0 },
+            { id: 3, name: 'Tentative', slug: 'tentative', color_bg: 'bg-yellow-50 border-yellow-200', color_text: 'text-yellow-800', sort_order: 30, is_absent: 0 },
+            { id: 4, name: 'Absent', slug: 'absent', color_bg: 'bg-gray-50 border-gray-200', color_text: 'text-gray-800', sort_order: 40, is_absent: 1 }
+        ]
+    }
+    async createParticipationStatus(payload) {
+        await this.init()
+        if (this.isElectron) return await this.electronAPI.statuses.create(payload)
+        return null
+    }
+    async updateParticipationStatus(id, payload) {
+        await this.init()
+        if (this.isElectron) return await this.electronAPI.statuses.update(id, payload)
+        return null
+    }
+    async deleteParticipationStatus(id, remap) {
+        await this.init()
+        if (this.isElectron) return await this.electronAPI.statuses.delete(id, remap)
+        return null
+    }
+
     async getEventStats() {
         await this.init()
         

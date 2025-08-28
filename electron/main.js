@@ -13,6 +13,7 @@ let taskService
 let eventService
 let serverService
 let eventTemplateService
+let participationStatusService
 
 // Import services
 async function initializeServices() {
@@ -22,6 +23,7 @@ async function initializeServices() {
     const eventServiceModule = await import('../src/services/eventService.js')
     const serverServiceModule = await import('../src/services/serverService.js')
     const eventTemplateServiceModule = await import('../src/services/eventTemplateService.js')
+    const participationStatusServiceModule = await import('../src/services/participationStatusService.js')
     
     // Use the singleton instances
     database = databaseService.default
@@ -30,6 +32,7 @@ async function initializeServices() {
     eventService = eventServiceModule.default
     serverService = serverServiceModule.default
     eventTemplateService = eventTemplateServiceModule.default
+    participationStatusService = participationStatusServiceModule.default
     
     // Initialize the database
     await database.init(app.getPath('userData'))
@@ -51,6 +54,7 @@ async function initializeServices() {
     await taskService.ensureInitialized()
     await eventService.ensureInitialized()
     await eventTemplateService.ensureInitialized()
+    await participationStatusService.ensureInitialized()
 }
 
 // IPC Handlers
@@ -334,6 +338,20 @@ function setupIpcHandlers() {
     })
     ipcMain.handle('template:delete', async (event, id) => {
         return await eventTemplateService.delete(id)
+    })
+
+    // Participation statuses operations
+    ipcMain.handle('status:getAll', async () => {
+        return await participationStatusService.getAll()
+    })
+    ipcMain.handle('status:create', async (event, payload) => {
+        return await participationStatusService.create(payload)
+    })
+    ipcMain.handle('status:update', async (event, id, payload) => {
+        return await participationStatusService.update(id, payload)
+    })
+    ipcMain.handle('status:delete', async (event, id, remap) => {
+        return await participationStatusService.delete(id, remap)
     })
     
     // Database operations

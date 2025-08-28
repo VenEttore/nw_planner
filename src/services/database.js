@@ -154,6 +154,21 @@ class DatabaseService {
             )
         `)
 
+        // Participation statuses table (customizable list)
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS participation_statuses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                slug TEXT NOT NULL UNIQUE,
+                color_bg TEXT NOT NULL,
+                color_text TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                is_absent BOOLEAN NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `)
+
         // Create indexes for performance
         this.db.exec(`
             CREATE INDEX IF NOT EXISTS idx_servers_region ON servers(region);
@@ -164,6 +179,8 @@ class DatabaseService {
             CREATE INDEX IF NOT EXISTS idx_events_character ON events(character_id);
             CREATE INDEX IF NOT EXISTS idx_events_time ON events(event_time);
             CREATE INDEX IF NOT EXISTS idx_event_templates_name ON event_templates(name);
+            CREATE INDEX IF NOT EXISTS idx_participation_statuses_slug ON participation_statuses(slug);
+            CREATE INDEX IF NOT EXISTS idx_participation_statuses_sort ON participation_statuses(sort_order);
         `)
 
         // Create triggers for timestamp updates
@@ -180,6 +197,11 @@ class DatabaseService {
         this.migrateTasksTableForOneTime()
         this.migrateEventTemplatesAddPayload()
         this.migrateEventTemplatesPruneLegacy()
+        this.migrateEventsDropParticipationCheck()
+        this.migrateEventTemplatesDropParticipationCheck()
+
+        // Seed default participation statuses if none exist
+        this.insertDefaultParticipationStatuses()
 
         // Note: Default tasks are no longer automatically inserted to keep the app clean
         // Users can manually add tasks or import data if needed
@@ -308,6 +330,132 @@ class DatabaseService {
         } catch (e) {
             try { this.db.exec('PRAGMA foreign_keys=ON;') } catch (_) {}
             console.warn('Event templates prune legacy migration skipped:', e)
+        }
+    }
+
+    migrateEventsDropParticipationCheck() {
+        try {
+            const row = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='events'").get()
+            const createSql = row?.sql || ''
+            if (!createSql.includes("CHECK(participation_status")) return
+
+            const all = this.db.prepare('SELECT * FROM events').all()
+            this.db.exec('PRAGMA foreign_keys=OFF;')
+            this.db.exec(`
+                BEGIN TRANSACTION;
+                CREATE TABLE events_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    event_type TEXT NOT NULL,
+                    server_name TEXT,
+                    event_time TIMESTAMP NOT NULL,
+                    timezone TEXT NOT NULL,
+                    character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+                    participation_status TEXT DEFAULT 'Signed Up',
+                    location TEXT,
+                    recurring_pattern TEXT,
+                    notification_enabled BOOLEAN DEFAULT 1,
+                    notification_minutes INTEGER DEFAULT 30,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            `)
+            const insert = this.db.prepare(`
+                INSERT INTO events_new (
+                    id, name, description, event_type, server_name, event_time, timezone, character_id,
+                    participation_status, location, recurring_pattern, notification_enabled, notification_minutes, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `)
+            for (const row of all) {
+                insert.run(
+                    row.id, row.name, row.description, row.event_type, row.server_name, row.event_time, row.timezone,
+                    row.character_id, row.participation_status, row.location, row.recurring_pattern,
+                    row.notification_enabled, row.notification_minutes, row.created_at
+                )
+            }
+            this.db.exec(`
+                DROP TABLE events;
+                ALTER TABLE events_new RENAME TO events;
+                COMMIT;
+            `)
+            this.db.exec('PRAGMA foreign_keys=ON;')
+        } catch (e) {
+            try { this.db.exec('PRAGMA foreign_keys=ON;') } catch (_) {}
+            console.warn('Events participation CHECK drop migration skipped:', e)
+        }
+    }
+
+    migrateEventTemplatesDropParticipationCheck() {
+        try {
+            const row = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='event_templates'").get()
+            const createSql = row?.sql || ''
+            if (!createSql.includes("CHECK(participation_status")) return
+
+            const all = this.db.prepare('SELECT * FROM event_templates').all()
+            this.db.exec('PRAGMA foreign_keys=OFF;')
+            this.db.exec(`
+                BEGIN TRANSACTION;
+                CREATE TABLE event_templates_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    event_type TEXT,
+                    description TEXT,
+                    location TEXT,
+                    participation_status TEXT DEFAULT 'Signed Up',
+                    notification_enabled BOOLEAN DEFAULT 1,
+                    notification_minutes INTEGER DEFAULT 30,
+                    time_strategy TEXT CHECK(time_strategy IN ('relative','fixed')) DEFAULT NULL,
+                    time_params TEXT,
+                    payload_json TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            `)
+            const insert = this.db.prepare(`
+                INSERT INTO event_templates_new (
+                    id, name, event_type, description, location, participation_status, notification_enabled,
+                    notification_minutes, time_strategy, time_params, payload_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `)
+            for (const row of all) {
+                insert.run(
+                    row.id, row.name, row.event_type, row.description, row.location, row.participation_status,
+                    row.notification_enabled, row.notification_minutes, row.time_strategy, row.time_params,
+                    row.payload_json, row.created_at, row.updated_at
+                )
+            }
+            this.db.exec(`
+                DROP TABLE event_templates;
+                ALTER TABLE event_templates_new RENAME TO event_templates;
+                COMMIT;
+            `)
+            this.db.exec('PRAGMA foreign_keys=ON;')
+        } catch (e) {
+            try { this.db.exec('PRAGMA foreign_keys=ON;') } catch (_) {}
+            console.warn('Event templates participation CHECK drop migration skipped:', e)
+        }
+    }
+
+    insertDefaultParticipationStatuses() {
+        try {
+            const count = this.db.prepare('SELECT COUNT(1) as c FROM participation_statuses').get()?.c || 0
+            if (count > 0) return
+            const insert = this.db.prepare(`
+                INSERT INTO participation_statuses (name, slug, color_bg, color_text, sort_order, is_absent)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `)
+            const rows = [
+                ['Signed Up', 'signed-up', 'bg-blue-50 border-blue-200', 'text-blue-800', 10, 0],
+                ['Confirmed', 'confirmed', 'bg-green-50 border-green-200', 'text-green-800', 20, 0],
+                ['Tentative', 'tentative', 'bg-yellow-50 border-yellow-200', 'text-yellow-800', 30, 0],
+                ['Absent', 'absent', 'bg-gray-50 border-gray-200', 'text-gray-800', 40, 1]
+            ]
+            const tx = this.db.transaction(() => {
+                for (const r of rows) insert.run(...r)
+            })
+            tx()
+        } catch (e) {
+            console.warn('Seeding participation statuses skipped:', e)
         }
     }
 
