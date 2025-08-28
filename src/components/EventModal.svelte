@@ -48,7 +48,12 @@
   ]
   
   // Participation statuses
-  let participationStatuses = []
+  const participationStatuses = [
+    'Signed Up',
+    'Confirmed',
+    'Tentative',
+    'Absent'
+  ]
   
   // Server list is inferred from the selected character; no explicit server dropdown needed
   
@@ -119,10 +124,7 @@
   async function reloadTemplates(){
     try { templates = await api.getEventTemplates() } catch (_) { templates = [] }
   }
-  async function reloadStatuses(){
-    try { participationStatuses = await api.getParticipationStatuses() } catch (_) { participationStatuses = [] }
-  }
-  $: if (show) { (async ()=>{ await reloadTemplates(); await reloadStatuses() })() }
+  $: if (show) { (async ()=>{ await reloadTemplates() })() }
 
   // Auto-apply initial template if provided on first show
   let appliedInitial = false
@@ -518,8 +520,8 @@
               bind:value={formData.participation_status}
               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
             >
-              {#each participationStatuses as s}
-                <option value={s.name}>{s.name}</option>
+              {#each participationStatuses as status}
+                <option value={status}>{status}</option>
               {/each}
             </select>
           </div>

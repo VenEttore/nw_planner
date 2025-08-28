@@ -91,13 +91,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         update: (id, partial) => ipcRenderer.invoke('template:update', id, partial),
         delete: (id) => ipcRenderer.invoke('template:delete', id)
     },
-    // Participation status
-    participation: {
-        getAll: () => ipcRenderer.invoke('status:getAll'),
-        create: (data) => ipcRenderer.invoke('status:create', data),
-        update: (id, data) => ipcRenderer.invoke('status:update', id, data),
-        delete: (id, replaceWithName) => ipcRenderer.invoke('status:delete', id, replaceWithName)
-    },
     
     // Utility functions
     utils: {

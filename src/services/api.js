@@ -879,37 +879,6 @@ class ApiService {
         return JSON.parse(localStorage.getItem('nw_event_templates') || '[]')
     }
 
-    // Participation statuses
-    async getParticipationStatuses() {
-        await this.init()
-        if (this.isElectron) return await this.electronAPI.participation.getAll()
-        return JSON.parse(localStorage.getItem('nw_participation_statuses') || '[]')
-    }
-    async createParticipationStatus(data) {
-        await this.init()
-        if (this.isElectron) return await this.electronAPI.participation.create(data)
-        const all = JSON.parse(localStorage.getItem('nw_participation_statuses') || '[]')
-        const withId = { id: Date.now(), ...data }
-        all.push(withId)
-        localStorage.setItem('nw_participation_statuses', JSON.stringify(all))
-        return withId
-    }
-    async updateParticipationStatus(id, data) {
-        await this.init()
-        if (this.isElectron) return await this.electronAPI.participation.update(id, data)
-        const all = JSON.parse(localStorage.getItem('nw_participation_statuses') || '[]')
-        const idx = all.findIndex(s => s.id === id)
-        if (idx !== -1) { all[idx] = { ...all[idx], ...data }; localStorage.setItem('nw_participation_statuses', JSON.stringify(all)); return all[idx] }
-        return null
-    }
-    async deleteParticipationStatus(id, replaceWithName=null) {
-        await this.init()
-        if (this.isElectron) return await this.electronAPI.participation.delete(id, replaceWithName)
-        const all = JSON.parse(localStorage.getItem('nw_participation_statuses') || '[]').filter(s => s.id !== id)
-        localStorage.setItem('nw_participation_statuses', JSON.stringify(all))
-        return true
-    }
-
     async createEventTemplate(tpl) {
         await this.init()
         if (this.isElectron) return await this.electronAPI.templates.create(tpl)
