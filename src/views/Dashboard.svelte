@@ -192,7 +192,13 @@
   }
 
   // Derived: visible events honoring showAbsent flag
-  $: visibleEvents = (upcomingEvents || []).filter(e => showAbsent ? true : (e.participation_status !== 'Absent'))
+  function isStatusAbsent(name) {
+    if (!name) return false
+    const s = (statuses || []).find(st => st.name === name)
+    if (s) return !!s.is_absent
+    return name === 'Absent'
+  }
+  $: visibleEvents = (upcomingEvents || []).filter(e => showAbsent ? true : !isStatusAbsent(e.participation_status))
 
   function getPriorityClass(priority) {
     const p = (priority || '').toLowerCase()

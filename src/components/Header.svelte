@@ -5,6 +5,7 @@
   
   let darkModeEnabled = false
   let eventsLoading = true
+  let statuses = []
   let upcomingEvents = []
   let refreshIntervalId = null
   
@@ -37,12 +38,19 @@
   async function loadUpcomingEvents() {
     eventsLoading = true
     try {
+      try { statuses = await api.getParticipationStatuses() } catch { statuses = [] }
       const events = await api.getUpcomingEvents(10)
       const now = new Date()
       const cutoff = new Date(now.getTime() + 20 * 60 * 60 * 1000)
+      function isStatusAbsent(name){
+        if (!name) return false
+        const s = (statuses || []).find(st => st.name === name)
+        if (s) return !!s.is_absent
+        return name === 'Absent'
+      }
       upcomingEvents = events
         .filter(e => {
-          if ((e.participation_status || 'Signed Up') === 'Absent') return false
+          if (isStatusAbsent(e.participation_status || 'Signed Up')) return false
           const t = new Date(e.event_time)
           return t >= now && t <= cutoff
         })
