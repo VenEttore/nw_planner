@@ -666,5 +666,5 @@
       </div>
     </div>
   {/if}
-  <EventModal show={showEventModal} editingEvent={editingEvent} characters={characters} isCreating={false} on:save={handleEventSave} on:cancel={() => { showEventModal = false; editingEvent = null }} on:delete={handleEventDelete} />
+  <EventModal show={showEventModal} editingEvent={editingEvent} characters={characters} statuses={statuses} isCreating={false} on:save={handleEventSave} on:cancel={() => { showEventModal = false; editingEvent = null }} on:delete={handleEventDelete} />
 </div> 

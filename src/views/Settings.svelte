@@ -32,6 +32,7 @@
   let showStatusEditor = false
   let statusForm = { name: '', slug: '', color_bg: 'bg-gray-50 border-gray-200', color_text: 'text-gray-800', sort_order: 0, is_absent: false }
   function resetStatusForm() { statusForm = { name: '', slug: '', color_bg: 'bg-gray-50 border-gray-200', color_text: 'text-gray-800', sort_order: 0, is_absent: false } }
+  let statusBackdropMouseDown = false
   
   
   
@@ -492,8 +493,7 @@
 
 <!-- Status Editor Modal -->
 {#if showStatusEditor}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
-    <button class="absolute inset-0 w-full h-full cursor-default" aria-label="Close" on:click={() => { showStatusEditor=false; editingStatus=null }} on:keydown={(e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); showStatusEditor=false; editingStatus=null } }}></button>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" on:keydown={(e)=>{ if (e.key==='Escape'){ showStatusEditor=false; editingStatus=null } }} on:mousedown={(e)=> statusBackdropMouseDown = (e.target===e.currentTarget)} on:click={(e)=>{ if (e.target===e.currentTarget && statusBackdropMouseDown){ showStatusEditor=false; editingStatus=null } }}>
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full" role="document" on:click|stopPropagation>
       <div class="p-6 border-b border-gray-200 dark:border-gray-700">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{editingStatus ? 'Edit Status' : 'New Status'}</h3>
