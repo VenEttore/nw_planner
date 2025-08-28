@@ -127,14 +127,23 @@
   async function updateRsvpStatus(eventId, newStatus) {
     try {
       await api.updateEventRsvp(eventId, newStatus)
-      await loadData()
+      // Patch the single event to avoid full reload/race
+      try {
+        const fresh = await api.getEventById(eventId)
+        if (fresh) {
+          upcomingEvents = (upcomingEvents || []).map(e => e.id === eventId ? {
+            ...e,
+            participation_status: fresh.participation_status
+          } : e)
+        }
+      } catch {}
     } catch (error) {
       console.error('Error updating RSVP:', error)
     }
   }
 
-  function openEditEvent(ev) {
-    editingEvent = ev
+  async function openEditEvent(ev) {
+    try { editingEvent = await api.getEventById(ev.id) || ev } catch { editingEvent = ev }
     showEventModal = true
   }
 

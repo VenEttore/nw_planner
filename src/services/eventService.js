@@ -228,12 +228,8 @@ class EventService {
     async updateParticipationStatus(eventId, status) {
         await this.ensureInitialized()
         
-        const validStatuses = ['Signed Up', 'Confirmed', 'Absent', 'Tentative']
-        if (!validStatuses.includes(status)) {
-            throw new Error(`Invalid participation status: ${status}`)
-        }
-        
-        const result = this.statements.updateParticipationStatus.run(status, eventId)
+        const safe = (status ?? '').toString()
+        const result = this.statements.updateParticipationStatus.run(safe, eventId)
         return result.changes > 0
     }
 

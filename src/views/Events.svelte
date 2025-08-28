@@ -56,8 +56,8 @@
   async function updateRsvpStatus(eventId, newStatus) {
     try {
       await api.updateEventRsvp(eventId, newStatus)
-      // Update local state only
-      events = (events || []).map(e => e.id === eventId ? { ...e, participation_status: newStatus } : e)
+      // Reconcile with fresh row to avoid drift
+      try { const fresh = await api.getEventById(eventId); if (fresh) events = (events || []).map(e => e.id === eventId ? fresh : e) } catch {}
     } catch (error) {
       console.error('Error updating RSVP:', error)
     }

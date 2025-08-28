@@ -89,6 +89,57 @@ Game Event Entity:
 - Notification Settings
 ```
 
+### 2.3.X Participation Status — Customization and Unified Integration (Plan)
+
+Objectives
+- Allow users to define custom participation statuses (name + color + semantics) from Settings.
+- Integrate the customizable list into the existing Events system without breaking existing data.
+- Ensure a single, consistent CRUD/save/display pipeline across Events page, Dashboard, Calendar, and EventModal.
+
+Data Model & Migrations
+- Keep `events.participation_status` as TEXT (free-form) for resilience.
+- New table `participation_statuses`:
+  - id INTEGER PK AUTOINCREMENT
+  - name TEXT UNIQUE NOT NULL (canonical label stored in events)
+  - slug TEXT UNIQUE NOT NULL (stable key derived from name)
+  - color_bg TEXT NOT NULL (chip/select field background class)
+  - color_text TEXT NOT NULL (chip/select field text class)
+  - sort_order INTEGER NOT NULL DEFAULT 0
+  - is_absent BOOLEAN NOT NULL DEFAULT 0 (for “Hide Absent” filters)
+- Migration tasks:
+  - Create `participation_statuses` with indexes (slug, sort_order).
+  - Seed defaults: Signed Up, Confirmed, Tentative, Absent (is_absent=1).
+  - Drop any legacy CHECK constraints in `events` that restrict participation_status.
+  - Back-compat: existing events keep stored names; unknown names render neutrally.
+
+Single Source of Truth & Access Layer
+- Main-process status service: CRUD, delete supports remap to replacement name across events.
+- IPC: `status:getAll|create|update|delete`.
+- Renderer: `api.getParticipationStatuses()` + statusRegistry (in-memory store) with invalidate() after Settings changes.
+
+Unified UI & Save Flow
+- Shared `ParticipationStatusSelect` (thin): props { value, statuses, disabled, onChange(value) }.
+  - Closed field recolors via `color_bg/color_text`; dropdown options are neutral.
+  - Awaits `onChange` Promise; disables while saving.
+- RSVP update helper (renderer): `updateEventStatus(eventId, nextName)` used by all views.
+  - 1) Optimistically update local event
+  - 2) `api.updateEventRsvp`
+  - 3) `api.getEventById` patch to prevent stale modal opens.
+
+Integration Points
+- EventModal: options from statusRegistry; modal opens with fresh `getEventById` snapshot.
+- Events page & Dashboard: use shared select + helper; “Hide Absent” consults `is_absent`.
+- Calendar: reads status name for display; edits via EventModal.
+
+Settings UI
+- Manage statuses with color preview, Absent flag, and reorder. Deleting prompts for replacement; service remaps events. Invalidate statusRegistry after changes.
+
+Testing Plan
+- DB migrations; defaults seeded; no CHECK violations block writes.
+- Settings CRUD and delete remap.
+- RSVP change consistency across Events/Dashboard; persists after navigation and re-opens.
+- Hide Absent works with custom statuses.
+
 #### 2.3.2 Guild/External Events
 ```
 External Event Entity:
