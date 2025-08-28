@@ -1,7 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte'
   import { format } from 'date-fns'
-  import StatusSelect from './StatusSelect.svelte'
   import { zonedTimeToUtc } from 'date-fns-tz'
   
   export let show = false
@@ -516,14 +515,18 @@
           </div>
           
           <div>
-            <label for="modal_participation_status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Participation Status</label>
-            <StatusSelect
-              id="modal_participation_status"
-              value={formData.participation_status}
-              statuses={Array.isArray(statuses) && statuses.length ? statuses : participationStatuses.map(n => ({ name: n }))}
-              selectClass="w-full"
-              on:change={(e)=> formData.participation_status = e.detail.value}
-            />
+            <label for="participation_status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Participation Status
+            </label>
+            <select
+              id="participation_status"
+              bind:value={formData.participation_status}
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+            >
+              {#each participationStatuses as status}
+                <option value={status}>{status}</option>
+              {/each}
+            </select>
           </div>
         </div>
         
