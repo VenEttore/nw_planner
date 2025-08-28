@@ -45,6 +45,7 @@
     const copy = { ...t, id: undefined, name: `${t.name} (copy)` }
     await api.createEventTemplate(copy)
     await load()
+    dispatch('changed')
   }
   async function remove(t){
     const { showConfirm } = await import('../stores/dialog.js')
@@ -52,6 +53,7 @@
     if (!ok) return
     await api.deleteEventTemplate(t.id)
     await load()
+    dispatch('changed')
   }
 
   $: filtered = (templates || [])
@@ -119,7 +121,7 @@
         {/if}
       </div>
 
-      <TemplateModal isOpen={showTemplateModal} template={editingTemplate} characters={characters} servers={servers} on:cancel={()=>{ showTemplateModal=false; editingTemplate=null }} on:save={async (e)=>{ try { const payload = { ...e.detail, payload_json: e.detail }; if (editingTemplate) await api.updateEventTemplate(editingTemplate.id, payload); else await api.createEventTemplate(payload); showTemplateModal=false; editingTemplate=null; await load() } catch (err) { console.error('Template save failed', err) } }} />
+      <TemplateModal isOpen={showTemplateModal} template={editingTemplate} characters={characters} servers={servers} on:cancel={()=>{ showTemplateModal=false; editingTemplate=null }} on:save={async (e)=>{ try { const payload = { ...e.detail, payload_json: e.detail }; if (editingTemplate) await api.updateEventTemplate(editingTemplate.id, payload); else await api.createEventTemplate(payload); showTemplateModal=false; editingTemplate=null; await load(); dispatch('changed') } catch (err) { console.error('Template save failed', err) } }} />
     </div>
   </div>
 {/if}

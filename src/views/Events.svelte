@@ -47,11 +47,17 @@
       loading = false
     }
   }
+
+  // Just-in-time refresh for template list used by the action bar selector
+  async function reloadTemplatesList() {
+    try { templates = await api.getEventTemplates() } catch { /* noop */ }
+  }
   
   async function updateRsvpStatus(eventId, newStatus) {
     try {
       await api.updateEventRsvp(eventId, newStatus)
-      await loadData() // Reload to get updated data
+      // Update local state only
+      events = (events || []).map(e => e.id === eventId ? { ...e, participation_status: newStatus } : e)
     } catch (error) {
       console.error('Error updating RSVP:', error)
     }
@@ -63,7 +69,8 @@
     if (!ok) return
     try {
       await api.deleteEvent(eventId)
-      await loadData()
+      // Remove locally without reloading everything
+      events = (events || []).filter(e => e.id !== eventId)
     } catch (error) {
       console.error('Error deleting event:', error)
     }
@@ -83,14 +90,19 @@
     const data = e.detail
     try {
       if (editingEvent) {
-        await api.updateEvent(editingEvent.id, data)
+        const updated = await api.updateEvent(editingEvent.id, data)
+        if (updated && updated.id) {
+          events = (events || []).map(ev => ev.id === updated.id ? { ...ev, ...updated } : ev)
+        }
       } else {
-        await api.createEvent(data)
+        const created = await api.createEvent(data)
+        if (created && created.id) {
+          events = [...(events || []), created]
+        }
       }
       showModal = false
       editingEvent = null
       pendingTemplateId = null
-      await loadData()
     } catch (err) {
       console.error('Error saving event:', err)
     }
@@ -161,7 +173,7 @@
       <div class="flex space-x-2">
         <button class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed" disabled={characters.length === 0} title={characters.length===0 ? 'Create a character first' : ''} on:click={openCreate}>Add New Event</button>
         <div class="relative">
-          <select class="btn-secondary text-sm px-3 py-2" on:change={(e)=>{ const tplId = e.target.value; if (!tplId) return; pendingTemplateId = tplId; openCreate(); e.target.value=''; }}>
+          <select class="btn-secondary text-sm px-3 py-2" on:focus={reloadTemplatesList} on:click={reloadTemplatesList} on:change={(e)=>{ const tplId = e.target.value; if (!tplId) return; pendingTemplateId = tplId; openCreate(); e.target.value=''; }}>
             <option value="">New from Template…</option>
             {#each templates as t}
               <option value={t.id}>{t.name}</option>
@@ -313,5 +325,10 @@
     </div>
   {/if}
   <EventModal show={showModal} editingEvent={editingEvent} characters={characters} isCreating={!editingEvent} initialTemplateId={pendingTemplateId} on:save={handleSave} on:cancel={() => { showModal = false; editingEvent = null; pendingTemplateId = null }} on:delete={async (e) => { try { await api.deleteEvent(e.detail); showModal = false; editingEvent = null; pendingTemplateId = null; await loadData() } catch (err) { console.error('Delete failed', err) } }} />
-  <TemplateManager isOpen={showTemplateManager} on:close={()=>{ showTemplateManager=false; loadData() }} on:apply={(e)=>{ showTemplateManager=false; pendingTemplateId = e.detail.id; editingEvent=null; showModal=true }} />
+  <TemplateManager
+    isOpen={showTemplateManager}
+    on:close={()=>{ showTemplateManager=false }}
+    on:changed={async ()=>{ try { templates = await api.getEventTemplates() } catch { /* noop */ } }}
+    on:apply={(e)=>{ showTemplateManager=false; pendingTemplateId = e.detail.id; editingEvent=null; showModal=true }}
+  />
 </div> 

@@ -128,12 +128,17 @@
 
   // Auto-apply initial template if provided on first show
   let appliedInitial = false
-  $: if (show && initialTemplateId && !appliedInitial && templates.length > 0) {
-    const exists = templates.find(t => t.id == initialTemplateId)
-    if (exists) {
-      applyTemplate(initialTemplateId)
-      appliedInitial = true
-    }
+  $: if (show && initialTemplateId && !appliedInitial) {
+    (async () => {
+      try {
+        await reloadTemplates()
+        const exists = (templates || []).find(t => t.id == initialTemplateId)
+        if (exists) {
+          applyTemplate(initialTemplateId)
+          appliedInitial = true
+        }
+      } catch (_) {}
+    })()
   }
 
   // Reset template auto-apply flag when modal closes
