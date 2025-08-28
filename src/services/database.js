@@ -438,20 +438,21 @@ class DatabaseService {
 
     insertDefaultParticipationStatuses() {
         try {
-            const count = this.db.prepare('SELECT COUNT(1) as c FROM participation_statuses').get()?.c || 0
-            if (count > 0) return
+            const ensure = this.db.prepare('SELECT 1 FROM participation_statuses WHERE slug = ?')
             const insert = this.db.prepare(`
                 INSERT INTO participation_statuses (name, slug, color_bg, color_text, sort_order, is_absent)
                 VALUES (?, ?, ?, ?, ?, ?)
             `)
             const rows = [
+                ['No Status', 'no-status', 'bg-gray-50 border-gray-200', 'text-gray-800', 0, 0],
                 ['Signed Up', 'signed-up', 'bg-blue-50 border-blue-200', 'text-blue-800', 10, 0],
                 ['Confirmed', 'confirmed', 'bg-green-50 border-green-200', 'text-green-800', 20, 0],
                 ['Tentative', 'tentative', 'bg-yellow-50 border-yellow-200', 'text-yellow-800', 30, 0],
-                ['Absent', 'absent', 'bg-gray-50 border-gray-200', 'text-gray-800', 40, 1]
+                ['Absent', 'absent', 'bg-gray-50 border-gray-200', 'text-gray-800', 40, 1],
+                ['Cancelled', 'cancelled', 'bg-gray-50 border-gray-200', 'text-gray-800', 50, 1]
             ]
             const tx = this.db.transaction(() => {
-                for (const r of rows) insert.run(...r)
+                for (const r of rows) { if (!ensure.get(r[1])) insert.run(...r) }
             })
             tx()
         } catch (e) {

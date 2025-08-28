@@ -93,7 +93,7 @@
     const ok = await showConfirm(`Delete status "${s.name}"? You may remap events using this status.`, 'Delete Status', 'Delete', 'Cancel')
     if (!ok) return
     try {
-      // Simple delete without remap for now
+      // Simple delete; backend protects No Status and supports optional remap
       await api.deleteParticipationStatus(s.id, null)
       await loadStatuses()
     } catch (e) { console.error('Delete status failed:', e) }

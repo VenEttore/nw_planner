@@ -44,6 +44,7 @@ class ParticipationStatusService {
 
     async create({ name, slug, color_bg, color_text, sort_order = 0, is_absent = 0 }) {
         await this.ensureInitialized()
+        if (slug === 'no-status') throw new Error('Reserved slug')
         const res = this.statements.insert.run(name, slug, color_bg, color_text, sort_order, is_absent ? 1 : 0)
         if (res.changes > 0) return this.getById(res.lastInsertRowid)
         return null
@@ -51,6 +52,10 @@ class ParticipationStatusService {
 
     async update(id, { name, slug, color_bg, color_text, sort_order = 0, is_absent = 0 }) {
         await this.ensureInitialized()
+        // disallow edits to No Status
+        const current = await this.getById(id)
+        if (current?.slug === 'no-status') throw new Error('No Status cannot be modified')
+        if (slug === 'no-status') throw new Error('Reserved slug')
         const res = this.statements.update.run(name, slug, color_bg, color_text, sort_order, is_absent ? 1 : 0, id)
         if (res.changes > 0) return this.getById(id)
         return null
@@ -61,6 +66,9 @@ class ParticipationStatusService {
         // Optional remap before delete
         const safeOptions = options || {}
         const { remapFromName, remapToName } = safeOptions
+        // prevent deleting No Status
+        const current = await this.getById(id)
+        if (current?.slug === 'no-status') throw new Error('No Status cannot be deleted')
         if (remapFromName && remapToName) {
             try { this.statements.remapEvents.run(remapToName, remapFromName) } catch {}
         }
