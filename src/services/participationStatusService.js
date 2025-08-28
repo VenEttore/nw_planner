@@ -59,7 +59,8 @@ class ParticipationStatusService {
     async delete(id, options = {}) {
         await this.ensureInitialized()
         // Optional remap before delete
-        const { remapFromName, remapToName } = options
+        const safeOptions = options || {}
+        const { remapFromName, remapToName } = safeOptions
         if (remapFromName && remapToName) {
             try { this.statements.remapEvents.run(remapToName, remapFromName) } catch {}
         }
