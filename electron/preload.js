@@ -77,6 +77,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         update: (id, eventData) => ipcRenderer.invoke('event:update', id, eventData),
         delete: (id) => ipcRenderer.invoke('event:delete', id),
         updateRsvp: (eventId, status) => ipcRenderer.invoke('event:updateRsvp', eventId, status),
+        getById: (id) => ipcRenderer.invoke('event:getById', id),
         getForCalendar: (startDate, endDate) => ipcRenderer.invoke('event:getForCalendar', startDate, endDate),
         getConflicts: (characterId, eventTime, excludeEventId) => ipcRenderer.invoke('event:getConflicts', characterId, eventTime, excludeEventId),
         getStats: () => ipcRenderer.invoke('event:getStats'),

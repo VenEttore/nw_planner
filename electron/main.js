@@ -289,6 +289,11 @@ function setupIpcHandlers() {
         return await eventService.deleteEvent(id)
     })
     
+    // Fetch single event by id (used to reconcile after inline updates)
+    ipcMain.handle('event:getById', async (event, id) => {
+        return await eventService.getEventById(id)
+    })
+    
     ipcMain.handle('event:updateRsvp', async (event, eventId, status) => {
         return await eventService.updateParticipationStatus(eventId, status)
     })

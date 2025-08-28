@@ -850,6 +850,15 @@ class ApiService {
         }
     }
 
+    async getEventById(id) {
+        await this.init()
+        if (this.isElectron) {
+            return await this.electronAPI.events.getById(id)
+        }
+        const existing = JSON.parse(localStorage.getItem('nw_events') || '[]')
+        return existing.find(e => e.id === id) || null
+    }
+
     async getEventStats() {
         await this.init()
         
