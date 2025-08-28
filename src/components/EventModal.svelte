@@ -7,6 +7,7 @@
   export let editingEvent = null
   export let characters = []
   export let isCreating = false
+  export let statuses = []
   
   const dispatch = createEventDispatcher()
   
@@ -47,13 +48,10 @@
     'Custom'
   ]
   
-  // Participation statuses
-  const participationStatuses = [
-    'Signed Up',
-    'Confirmed',
-    'Tentative',
-    'Absent'
-  ]
+  // Participation statuses (prefer provided prop)
+  $: participationStatuses = (Array.isArray(statuses) && statuses.length > 0)
+    ? statuses.map(s => s.name)
+    : ['Signed Up','Confirmed','Tentative','Absent']
   
   // Server list is inferred from the selected character; no explicit server dropdown needed
   

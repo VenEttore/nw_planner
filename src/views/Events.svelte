@@ -9,6 +9,7 @@
   let events = []
   let characters = []
   let templates = []
+  let statuses = []
   let filterType = 'all'
   let filterCharacter = 'all'
   let showModal = false
@@ -31,15 +32,17 @@
   async function loadData() {
     loading = true
     try {
-      // Load events and characters
-      const [eventsData, charactersData, templatesData] = await Promise.all([
+      // Load events, characters, statuses, and templates
+      const [eventsData, charactersData, statusData, templatesData] = await Promise.all([
         api.getEvents(),
         api.getActiveCharacters(),
+        api.getParticipationStatuses(),
         api.getEventTemplates()
       ])
       
       events = eventsData
       characters = charactersData
+      statuses = Array.isArray(statusData) ? statusData : []
       templates = templatesData
     } catch (error) {
       console.error('Error loading events data:', error)
@@ -252,17 +255,16 @@
                 <select 
                   value={event.participation_status || 'Signed Up'}
                   on:change={(e) => updateRsvpStatus(event.id, e.target.value)}
-                  class="text-xs pr-6 pl-2 py-1 rounded border appearance-none bg-[length:12px_12px] bg-no-repeat bg-right-2 bg-[url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 20 20\' fill=\'none\' stroke=\'%23666\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 8 10 12 14 8\'/></svg>')] {
-                    event.participation_status === 'Confirmed' ? 'bg-green-50 border-green-200 text-green-800' :
-                    event.participation_status === 'Signed Up' ? 'bg-blue-50 border-blue-200 text-blue-800' :
-                    event.participation_status === 'Tentative' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
-                    'bg-gray-50 border-gray-200 text-gray-800'
-                  }"
+                  class="text-xs pr-6 pl-2 py-1 rounded border appearance-none bg-[length:12px_12px] bg-no-repeat bg-right-2 bg-[url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 20 20\' fill=\'none\' stroke=\'%23666\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 8 10 12 14 8\'/></svg>')] bg-gray-50 border-gray-200 text-gray-800"
                 >
-                  <option value="Signed Up">Signed Up</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Tentative">Tentative</option>
-                  <option value="Absent">Absent</option>
+                  {#each (statuses.length ? statuses : [
+                    { name: 'Signed Up' },
+                    { name: 'Confirmed' },
+                    { name: 'Tentative' },
+                    { name: 'Absent' }
+                  ]) as s}
+                    <option value={s.name}>{s.name}</option>
+                  {/each}
                 </select>
                 
                 <!-- Action Buttons -->
@@ -331,7 +333,7 @@
       {/if}
     </div>
   {/if}
-  <EventModal show={showModal} editingEvent={editingEvent} characters={characters} isCreating={!editingEvent} initialTemplateId={pendingTemplateId} on:save={handleSave} on:cancel={() => { showModal = false; editingEvent = null; pendingTemplateId = null }} on:delete={async (e) => { try { await api.deleteEvent(e.detail); showModal = false; editingEvent = null; pendingTemplateId = null; await loadData() } catch (err) { console.error('Delete failed', err) } }} />
+  <EventModal show={showModal} editingEvent={editingEvent} characters={characters} statuses={statuses} isCreating={!editingEvent} initialTemplateId={pendingTemplateId} on:save={handleSave} on:cancel={() => { showModal = false; editingEvent = null; pendingTemplateId = null }} on:delete={async (e) => { try { await api.deleteEvent(e.detail); showModal = false; editingEvent = null; pendingTemplateId = null; await loadData() } catch (err) { console.error('Delete failed', err) } }} />
   <TemplateManager
     isOpen={showTemplateManager}
     on:close={()=>{ showTemplateManager=false }}

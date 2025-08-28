@@ -8,6 +8,7 @@
   let characters = []
   let displayedTasks = []
   let upcomingEvents = []
+  let statuses = []
   let showAbsent = true
   let resetTimers = {}
   let activeTimers = []
@@ -92,6 +93,9 @@
         selectedCharacterServers = Array.from(byKey.values())
       }
       
+      // Load statuses
+      try { statuses = await api.getParticipationStatuses() } catch { statuses = [] }
+
       // Load upcoming events (limit to next 7 days)
       try {
         const events = await api.getUpcomingEvents(20)
@@ -387,10 +391,14 @@
                         on:change={(e) => updateRsvpStatus(event.id, e.target.value)}
                         class="text-[10px] px-1.5 py-0.5 rounded border bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"
                       >
-                        <option value="Signed Up">Signed Up</option>
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Tentative">Tentative</option>
-                        <option value="Absent">Absent</option>
+                        {#each (statuses.length ? statuses : [
+                          { name: 'Signed Up' },
+                          { name: 'Confirmed' },
+                          { name: 'Tentative' },
+                          { name: 'Absent' }
+                        ]) as s}
+                          <option value={s.name}>{s.name}</option>
+                        {/each}
                       </select>
                     </div>
                   </div>
