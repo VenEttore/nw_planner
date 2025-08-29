@@ -134,6 +134,7 @@
         id: event.id,
         title: event.name,
         start: event.event_time,
+        allDay: false,
         description: event.description,
         extendedProps: {
           type: event.event_type,
