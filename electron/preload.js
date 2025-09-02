@@ -99,6 +99,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
         update: (id, payload) => ipcRenderer.invoke('status:update', id, payload),
         delete: (id, remap) => ipcRenderer.invoke('status:delete', id, remap)
     },
+    // Steam accounts
+    steam: {
+        getAll: () => ipcRenderer.invoke('steam:getAll'),
+        getById: (id) => ipcRenderer.invoke('steam:getById', id),
+        create: (payload) => ipcRenderer.invoke('steam:create', payload),
+        update: (id, payload) => ipcRenderer.invoke('steam:update', id, payload),
+        delete: (id, options) => ipcRenderer.invoke('steam:delete', id, options)
+    },
     
     // Utility functions
     utils: {

@@ -59,6 +59,42 @@ class ApiService {
         }
     }
 
+    // Steam accounts
+    async getSteamAccounts() {
+        await this.init()
+        if (this.isElectron) return await this.electronAPI.steam.getAll()
+        return JSON.parse(localStorage.getItem('nw_steam_accounts') || '[]')
+    }
+    async createSteamAccount(payload) {
+        await this.init()
+        if (this.isElectron) return await this.electronAPI.steam.create(payload)
+        const all = JSON.parse(localStorage.getItem('nw_steam_accounts') || '[]')
+        const withId = { id: Date.now(), ...payload }
+        all.push(withId)
+        localStorage.setItem('nw_steam_accounts', JSON.stringify(all))
+        return withId
+    }
+    async updateSteamAccount(id, partial) {
+        await this.init()
+        if (this.isElectron) return await this.electronAPI.steam.update(id, partial)
+        const all = JSON.parse(localStorage.getItem('nw_steam_accounts') || '[]')
+        const idx = all.findIndex(a => a.id === id)
+        if (idx !== -1) {
+            all[idx] = { ...all[idx], ...partial }
+            localStorage.setItem('nw_steam_accounts', JSON.stringify(all))
+            return all[idx]
+        }
+        return null
+    }
+    async deleteSteamAccount(id, options) {
+        await this.init()
+        if (this.isElectron) return await this.electronAPI.steam.delete(id, options)
+        const all = JSON.parse(localStorage.getItem('nw_steam_accounts') || '[]')
+        const filtered = all.filter(a => a.id !== id)
+        localStorage.setItem('nw_steam_accounts', JSON.stringify(filtered))
+        return true
+    }
+
     // Character operations
     async getCharacters() {
         await this.init()

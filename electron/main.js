@@ -14,6 +14,7 @@ let eventService
 let serverService
 let eventTemplateService
 let participationStatusService
+let steamAccountService
 
 // Import services
 async function initializeServices() {
@@ -24,6 +25,7 @@ async function initializeServices() {
     const serverServiceModule = await import('../src/services/serverService.js')
     const eventTemplateServiceModule = await import('../src/services/eventTemplateService.js')
     const participationStatusServiceModule = await import('../src/services/participationStatusService.js')
+    const steamAccountServiceModule = await import('../src/services/steamAccountService.js')
     
     // Use the singleton instances
     database = databaseService.default
@@ -33,6 +35,7 @@ async function initializeServices() {
     serverService = serverServiceModule.default
     eventTemplateService = eventTemplateServiceModule.default
     participationStatusService = participationStatusServiceModule.default
+    steamAccountService = steamAccountServiceModule.default
     
     // Initialize the database
     await database.init(app.getPath('userData'))
@@ -55,6 +58,7 @@ async function initializeServices() {
     await eventService.ensureInitialized()
     await eventTemplateService.ensureInitialized()
     await participationStatusService.ensureInitialized()
+    await steamAccountService.ensureInitialized()
 }
 
 // IPC Handlers
@@ -352,6 +356,23 @@ function setupIpcHandlers() {
     })
     ipcMain.handle('status:delete', async (event, id, remap) => {
         return await participationStatusService.delete(id, remap)
+    })
+
+    // Steam accounts operations
+    ipcMain.handle('steam:getAll', async () => {
+        return await steamAccountService.getAll()
+    })
+    ipcMain.handle('steam:getById', async (event, id) => {
+        return await steamAccountService.getById(id)
+    })
+    ipcMain.handle('steam:create', async (event, payload) => {
+        return await steamAccountService.create(payload)
+    })
+    ipcMain.handle('steam:update', async (event, id, payload) => {
+        return await steamAccountService.update(id, payload)
+    })
+    ipcMain.handle('steam:delete', async (event, id, options) => {
+        return await steamAccountService.delete(id, options)
     })
     
     // Database operations

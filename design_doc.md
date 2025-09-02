@@ -1066,6 +1066,95 @@ Testing checklist (Tasks)
 - Verify weekly reset tokens match server-local Tuesday 05:00 periods across timezones/DST.
 - When the weekly reset occurs, assigned weekly tasks for affected characters re-render as incomplete without manual refresh.
 
+### 9.12 Characters — Steam Account Association (NEW)
+
+Goals
+- Associate each character with an optional Steam account for easier grouping and filtering.
+- Keep the flow simple: select an existing account or quickly add a new one inline.
+- Provide a dedicated manager to CRUD Steam accounts, mirroring the Event Templates manager UX.
+
+Data Model & Migrations
+- New table: `steam_accounts`
+  - `id INTEGER PRIMARY KEY AUTOINCREMENT`
+  - `label TEXT NOT NULL UNIQUE` (user-friendly name; e.g., "Main", "Alt #2", or Steam display name)
+  - `steam_id TEXT` (optional; raw SteamID/URL fragment if the user wants it)
+  - `notes TEXT` (optional)
+  - `created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`
+  - `updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`
+- Characters table change:
+  - Add `steam_account_id INTEGER REFERENCES steam_accounts(id) ON DELETE SET NULL`
+  - Index: `CREATE INDEX IF NOT EXISTS idx_characters_steam_account ON characters(steam_account_id);`
+- Migration plan:
+  - Create `steam_accounts` if not exists; create indexes.
+  - Add nullable `steam_account_id` to `characters` if missing.
+  - Back-compat: leave null for existing characters; no data rewriting.
+
+Services & IPC
+- New service `steamAccountService.js` (main process):
+  - `getAll()`, `getById(id)`, `create({label, steam_id?, notes?})`, `update(id, partial)`, `delete(id, { reassignToId?: number }?)`.
+  - On delete: if characters reference the account, allow either (a) reassign to another account id, or (b) set null.
+  - Enforce unique `label`; optional unique constraint on `steam_id` is not required (different labels may share empty or same id if user insists).
+- IPC channels:
+  - `steam:getAll`, `steam:create`, `steam:update`, `steam:delete`.
+- Renderer API (`src/services/api.js`):
+  - `getSteamAccounts()`, `createSteamAccount(dto)`, `updateSteamAccount(id, partial)`, `deleteSteamAccount(id, options)`.
+
+UI/UX — Character Create/Edit Modal
+- Add a new field "Steam Account" above Company:
+  - Control: select dropdown bound to `steam_account_id` with options:
+    - "(None)" → `null`
+    - Existing accounts ordered by label
+    - Separator
+    - "Add new…" (special option)
+  - Selecting "Add new…" opens an inline mini-form below the select:
+    - Inputs: `label` (required), `steam_id` (optional), `notes` (optional)
+    - Buttons: "Create" (primary), "Cancel"
+    - On Create: call `createSteamAccount`; on success, close inline form, refresh list, and auto-select the newly created account
+    - Validation: label required; show duplicate-label error nicely
+  - Accessibility:
+    - The select is a native `<select>`; inline form uses proper `<label for>` associations and `role="group"`.
+    - Keyboard focus goes to `label` input when inline form opens.
+- Add a secondary action button in the modal header or near the field: "Manage Steam Accounts" to open the manager view.
+
+UI/UX — Steam Accounts Manager (CRUD)
+- Entry points:
+  - Characters page: button "Manage Steam Accounts"
+  - Character modal: link/button opens the manager
+- Layout (mirror Event Templates manager):
+  - Title + "New Account" button + search input (debounced) + sort (Name | Updated)
+  - List/table columns: Label, Steam ID (optional), Updated, Actions (Edit, Delete)
+  - Create/Edit use a shared modal with fields: Label (required), Steam ID (optional), Notes (optional)
+  - Delete flow:
+    - If account has no linked characters → confirm delete
+    - If linked characters exist → confirmation dialog offers:
+      - Reassign all to another account (select) OR
+      - Set to None
+    - Operation executed via `steamAccountService.delete(id, { reassignToId? })`
+  - A11y: All actions are `<button>`; manager has `role="dialog"`, focus trap, ESC to close.
+
+Renderer Integration
+- Character forms load accounts via `getSteamAccounts()` on open; keep a simple in-memory cache invalidated on create/update/delete.
+- After inline create, refresh the list and select the new id.
+- When saving a character, include `steam_account_id` (nullable) in payload to the service.
+
+Testing Plan (Additions)
+- Migrations: tables and indexes created idempotently; existing characters unaffected.
+- CRUD:
+  - Create/Edit/Delete accounts; duplicate label validation surfaced to user.
+  - Delete with reassignment; verify affected characters’ `steam_account_id` updated.
+  - Delete with Set to None; verify characters set to null.
+- Character modal:
+  - Select existing account; save; reopen shows selection preserved.
+  - Choose "Add new…", create account; auto-selected; save character; persists.
+- Manager:
+  - Search and sort; list updates after mutations without reload.
+- A11y: Keyboard-only flow for select, inline add, and manager dialogs.
+
+Notes & Scope
+- This feature is fully local and optional; no external Steam API hooks.
+- Future: filtering characters by Steam account on Characters/Tasks/Calendar views.
+
+
 ## 10. Comprehensive Testing Protocol
 
 ### 10.1 Pre-Test Setup

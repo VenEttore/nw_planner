@@ -7,6 +7,8 @@
   
   let servers = []
   let serversLoading = true
+  let steamAccounts = []
+  let steamLoading = false
   
   const dispatch = createEventDispatcher()
   
@@ -17,6 +19,7 @@
     server_timezone: '',
     faction: 'Factionless',
     company: '',
+    steam_account_id: null,
     active_status: true,
     notes: ''
   }
@@ -29,6 +32,8 @@
   
   let loading = false
   let errors = {}
+  let showInlineSteamForm = false
+  let newSteam = { label: '', notes: '' }
   
   // Prevent re-initializing form while typing; only initialize when opening or switching target
   let initializedForId = null
@@ -38,6 +43,7 @@
     const currentTargetId = character?.id ?? '__create__'
     if (initializedForId !== currentTargetId) {
       loadServers()
+      loadSteamAccounts(true)
       
       if (character) {
         // Edit mode
@@ -47,6 +53,7 @@
           server_timezone: character.server_timezone || '',
           faction: character.faction || 'Factionless',
           company: character.company || '',
+          steam_account_id: character.steam_account_id || null,
           active_status: character.active_status !== undefined ? character.active_status : true,
           notes: character.notes || ''
         }
@@ -58,6 +65,7 @@
           server_timezone: '',
           faction: 'Factionless',
           company: '',
+          steam_account_id: null,
           active_status: true,
           notes: ''
         }
@@ -72,6 +80,23 @@
     const timezone = getServerTimezone(formData.server_name)
     if (timezone) {
       formData.server_timezone = timezone
+    }
+  }
+
+  // React to "Add new…" selection
+  $: if (formData?.steam_account_id === '__add_new__') {
+    showInlineSteamForm = true
+  }
+
+  async function createInlineSteamAccount() {
+    try {
+      const created = await api.createSteamAccount({ label: newSteam.label, notes: newSteam.notes || null })
+      await loadSteamAccounts(true)
+      formData.steam_account_id = created?.id || null
+      showInlineSteamForm = false
+      newSteam = { label: '', notes: '' }
+    } catch (e) {
+      console.error('Failed to create Steam account:', e)
     }
   }
   
@@ -95,6 +120,19 @@
       }
     } finally {
       serversLoading = false
+    }
+  }
+
+  async function loadSteamAccounts(force = false) {
+    if (steamAccounts.length > 0 && !force) return
+    steamLoading = true
+    try {
+      steamAccounts = await api.getSteamAccounts()
+    } catch (e) {
+      console.error('Failed to load Steam accounts:', e)
+      steamAccounts = []
+    } finally {
+      steamLoading = false
     }
   }
   
@@ -196,6 +234,25 @@
             {/if}
           </div>
           
+          <!-- Steam Account -->
+          <div>
+            <label for="steam" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Steam Account
+            </label>
+            <select
+              id="steam"
+              bind:value={formData.steam_account_id}
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-nw-blue dark:bg-gray-700 dark:text-white"
+              disabled={steamLoading}
+            >
+              <option value={null}>(None)</option>
+              {#each steamAccounts as acc}
+                <option value={acc.id}>{acc.label}</option>
+              {/each}
+              <option value="__add_new__">Add new…</option>
+            </select>
+          </div>
+
           <!-- Server -->
           <div>
             <label for="server" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -274,6 +331,26 @@
             </label>
           </div>
           
+          {#if showInlineSteamForm}
+          <div class="border rounded-md p-3 bg-gray-50 dark:bg-gray-900" role="group" aria-labelledby="newSteamLegend">
+            <div id="newSteamLegend" class="sr-only">New Steam Account</div>
+            <div class="grid grid-cols-1 gap-3">
+              <div>
+                <label for="newSteamLabel" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Steam Account Label *</label>
+                <input id="newSteamLabel" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={newSteam.label} required />
+              </div>
+              <div>
+                <label for="newSteamNotes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes (optional)</label>
+                <input id="newSteamNotes" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={newSteam.notes} />
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-3">
+              <button type="button" class="px-3 py-2 border rounded-md" on:click={() => { showInlineSteamForm=false; formData.steam_account_id=null }}>Cancel</button>
+              <button type="button" class="px-3 py-2 rounded-md text-white bg-nw-blue" on:click={createInlineSteamAccount} disabled={!newSteam.label.trim()}>Create</button>
+            </div>
+          </div>
+          {/if}
+
           <!-- Notes -->
           <div>
             <label for="notes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

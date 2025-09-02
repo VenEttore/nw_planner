@@ -16,18 +16,34 @@ class CharacterService {
         // Prepare all SQL statements for better performance
         this.statements = {
             insert: await this.db.prepare(`
-                INSERT INTO characters (name, server_name, server_timezone, faction, company, active_status, notes, avatar_path)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO characters (name, server_name, server_timezone, faction, company, steam_account_id, active_status, notes, avatar_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `),
             update: await this.db.prepare(`
                 UPDATE characters 
-                SET name = ?, server_name = ?, server_timezone = ?, faction = ?, company = ?, active_status = ?, notes = ?, avatar_path = ?
+                SET name = ?, server_name = ?, server_timezone = ?, faction = ?, company = ?, steam_account_id = ?, active_status = ?, notes = ?, avatar_path = ?
                 WHERE id = ?
             `),
             delete: await this.db.prepare('DELETE FROM characters WHERE id = ?'),
-            getById: await this.db.prepare('SELECT * FROM characters WHERE id = ?'),
-            getAll: await this.db.prepare('SELECT * FROM characters ORDER BY active_status DESC, name ASC'),
-            getActive: await this.db.prepare('SELECT * FROM characters WHERE active_status = 1 ORDER BY name ASC'),
+            getById: await this.db.prepare(`
+                SELECT c.*, sa.label AS steam_label
+                FROM characters c
+                LEFT JOIN steam_accounts sa ON sa.id = c.steam_account_id
+                WHERE c.id = ?
+            `),
+            getAll: await this.db.prepare(`
+                SELECT c.*, sa.label AS steam_label
+                FROM characters c
+                LEFT JOIN steam_accounts sa ON sa.id = c.steam_account_id
+                ORDER BY c.active_status DESC, c.name ASC
+            `),
+            getActive: await this.db.prepare(`
+                SELECT c.*, sa.label AS steam_label
+                FROM characters c
+                LEFT JOIN steam_accounts sa ON sa.id = c.steam_account_id
+                WHERE c.active_status = 1
+                ORDER BY c.name ASC
+            `),
             getByServer: await this.db.prepare('SELECT * FROM characters WHERE server_name = ? ORDER BY name ASC'),
             getByFaction: await this.db.prepare('SELECT * FROM characters WHERE faction = ? ORDER BY name ASC'),
             updateActiveStatus: await this.db.prepare('UPDATE characters SET active_status = ? WHERE id = ?'),
@@ -66,6 +82,9 @@ class CharacterService {
 	            const serverTimezone = raw.serverTimezone ?? raw.server_timezone
 	            const faction = raw.faction
 	            const company = Object.prototype.hasOwnProperty.call(raw, 'company') ? raw.company : null
+	            const steamAccountId = Object.prototype.hasOwnProperty.call(raw, 'steam_account_id')
+	                ? raw.steam_account_id
+	                : (Object.prototype.hasOwnProperty.call(raw, 'steamAccountId') ? raw.steamAccountId : null)
 	            const activeStatus = Object.prototype.hasOwnProperty.call(raw, 'activeStatus')
 	                ? raw.activeStatus
 	                : (Object.prototype.hasOwnProperty.call(raw, 'active_status') ? raw.active_status : true)
@@ -88,6 +107,7 @@ class CharacterService {
 	                serverTimezone,
 	                faction,
 	                company,
+	                steamAccountId,
 	                activeStatus ? 1 : 0,
 	                notes,
 	                avatarPath
@@ -116,6 +136,9 @@ class CharacterService {
 	            const serverTimezone = (raw.serverTimezone ?? raw.server_timezone) ?? existing.server_timezone
 	            const faction = raw.faction ?? existing.faction
 	            const company = Object.prototype.hasOwnProperty.call(raw, 'company') ? raw.company : existing.company
+	            const steamAccountId = Object.prototype.hasOwnProperty.call(raw, 'steam_account_id')
+	                ? raw.steam_account_id
+	                : (Object.prototype.hasOwnProperty.call(raw, 'steamAccountId') ? raw.steamAccountId : existing.steam_account_id)
 	            const activeStatus = Object.prototype.hasOwnProperty.call(raw, 'activeStatus')
 	                ? raw.activeStatus
 	                : (Object.prototype.hasOwnProperty.call(raw, 'active_status') ? raw.active_status : existing.active_status)
@@ -133,6 +156,7 @@ class CharacterService {
 	                serverTimezone,
 	                faction,
 	                company,
+	                steamAccountId,
 	                activeStatus ? 1 : 0,
 	                notes,
 	                avatarPath,

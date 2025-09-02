@@ -2,11 +2,13 @@
   import { onMount } from 'svelte'
   import api from '../services/api.js'
   import CharacterModal from '../components/CharacterModal.svelte'
+  import SteamAccountManager from '../components/SteamAccountManager.svelte'
   
   let loading = true
   let characters = []
   let showModal = false
   let editingCharacter = null
+  let showSteamManager = false
   
   onMount(async () => {
     await loadCharacters()
@@ -21,6 +23,10 @@
     } finally {
       loading = false
     }
+  }
+
+  function openSteamManager() {
+    showSteamManager = true
   }
   
 
@@ -77,7 +83,10 @@
     </div>
   {:else}
     <div class="mb-6">
-      <button class="btn-primary" on:click={openCreateModal}>Add New Character</button>
+      <div class="flex gap-2">
+        <button class="btn-primary" on:click={openCreateModal}>Add New Character</button>
+        <button class="btn-secondary" on:click={openSteamManager}>Manage Steam Accounts</button>
+      </div>
     </div>
     
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -99,6 +108,12 @@
               <span class="text-sm text-gray-600 dark:text-gray-400">Server:</span>
               <span class="text-sm text-gray-900 dark:text-white">{character.server_name}</span>
             </div>
+            {#if character.steam_account_id}
+            <div class="flex justify-between">
+              <span class="text-sm text-gray-600 dark:text-gray-400">Steam:</span>
+              <span class="text-sm text-gray-900 dark:text-white">{character.steam_label || 'Linked'}</span>
+            </div>
+            {/if}
             <div class="flex justify-between">
               <span class="text-sm text-gray-600 dark:text-gray-400">Faction:</span>
               <span class="text-sm faction-{character.faction.toLowerCase()}">{character.faction}</span>
@@ -141,4 +156,7 @@
   bind:isOpen={showModal} 
   character={editingCharacter} 
   on:saved={handleCharacterSaved}
-/> 
+/>
+
+<!-- Steam Account Manager -->
+<SteamAccountManager bind:isOpen={showSteamManager} on:close={() => showSteamManager=false} />

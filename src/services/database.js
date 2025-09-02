@@ -61,7 +61,7 @@ class DatabaseService {
             )
         `)
 
-        // Characters table
+        // Characters table (base schema; steam_account_id added via migration for existing DBs)
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS characters (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,6 +75,17 @@ class DatabaseService {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 notes TEXT,
                 avatar_path TEXT
+            )
+        `)
+
+        // Steam accounts table
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS steam_accounts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                label TEXT NOT NULL UNIQUE,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `)
 
@@ -199,6 +210,7 @@ class DatabaseService {
         this.migrateEventTemplatesPruneLegacy()
         this.migrateEventsDropParticipationCheck()
         this.migrateEventTemplatesDropParticipationCheck()
+        this.migrateCharactersAddSteamAccount()
 
         // Seed default participation statuses if none exist
         this.insertDefaultParticipationStatuses()
@@ -433,6 +445,40 @@ class DatabaseService {
         } catch (e) {
             try { this.db.exec('PRAGMA foreign_keys=ON;') } catch (_) {}
             console.warn('Event templates participation CHECK drop migration skipped:', e)
+        }
+    }
+
+    migrateCharactersAddSteamAccount() {
+        try {
+            const cols = this.db.prepare("PRAGMA table_info('characters')").all()
+            const hasSteam = cols.some(c => c.name === 'steam_account_id')
+            if (!hasSteam) {
+                this.db.exec("ALTER TABLE characters ADD COLUMN steam_account_id INTEGER REFERENCES steam_accounts(id) ON DELETE SET NULL")
+            }
+        } catch (e) {
+            console.warn('Characters steam_account_id migration skipped:', e)
+        }
+        try {
+            // Ensure steam_accounts table exists (idempotent)
+            const row = this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='steam_accounts'").get()
+            if (!row) {
+                this.db.exec(`
+                    CREATE TABLE steam_accounts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        label TEXT NOT NULL UNIQUE,
+                        notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                `)
+            }
+        } catch (e) {
+            console.warn('Steam accounts table ensure skipped:', e)
+        }
+        try {
+            this.db.exec("CREATE INDEX IF NOT EXISTS idx_characters_steam_account ON characters(steam_account_id);")
+        } catch (e) {
+            console.warn('Index create for characters.steam_account_id skipped:', e)
         }
     }
 
