@@ -210,6 +210,16 @@
     return 'text-gray-500 dark:text-gray-400'
   }
 
+  function eventTypeWithWar(ev) {
+    const t = ev?.event_type || ''
+    if (t === 'War') {
+      const role = (ev.war_role || ev.war_type || 'Unspecified')
+      if (role && role !== 'Unspecified') return `War (${role})`
+      return 'War'
+    }
+    return t
+  }
+
   async function startResetTimers() {
     // Start timers for all unique servers from active characters
     if (selectedCharacterServers.length > 0) {
@@ -380,7 +390,7 @@
                     <div class="flex-1">
                       <div class="flex items-center gap-2">
                         <span class="font-medium text-gray-900 dark:text-white text-sm">{event.name}</span>
-                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{event.event_type}</span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{eventTypeWithWar(event)}</span>
                       </div>
                       <div class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                         📅 {event.time} - {event.server}

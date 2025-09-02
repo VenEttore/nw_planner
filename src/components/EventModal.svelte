@@ -24,7 +24,8 @@
     recurring_pattern: null,
     notification_enabled: true,
     notification_minutes: 30,
-    timezone: ''
+    timezone: '',
+    war_role: 'Unspecified'
   }
   
   // Validation
@@ -91,7 +92,8 @@
       recurring_pattern: editingEvent.recurring_pattern || null,
       notification_enabled: editingEvent.notification_enabled !== false,
       notification_minutes: editingEvent.notification_minutes || 30,
-      timezone: editingEvent.timezone || ''
+      timezone: editingEvent.timezone || '',
+      war_role: editingEvent.war_role || 'Unspecified'
     }
     isValid = true
     timeMode = 'local'
@@ -110,7 +112,8 @@
       recurring_pattern: null,
       notification_enabled: true,
       notification_minutes: 30,
-      timezone: characters.length > 0 ? characters[0].server_timezone : Intl.DateTimeFormat().resolvedOptions().timeZone
+      timezone: characters.length > 0 ? characters[0].server_timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
+      war_role: 'Unspecified'
     }
     errors = {}
     isValid = true
@@ -420,12 +423,9 @@
           {/if}
         </div>
         
-        <!-- Template Apply + Event Type -->
+        <!-- Template Apply + Event Type / War Type -->
         <div>
           <div class="flex items-center justify-between mb-2">
-            <label for="event_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Event Type *
-            </label>
             {#if templates.length > 0}
             <div class="flex items-center gap-2">
               <label for="apply_template" class="text-xs text-gray-600 dark:text-gray-400">Apply Template</label>
@@ -438,21 +438,40 @@
             </div>
             {/if}
           </div>
-          <select
-            id="event_type"
-            bind:value={formData.event_type}
-            on:change={handleEventTypeChange}
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
-            class:border-red-500={errors.event_type}
-            required
-          >
-            {#each eventTypes as eventType}
-              <option value={eventType}>{eventType}</option>
-            {/each}
-          </select>
-          {#if errors.event_type}
-            <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.event_type}</p>
-          {/if}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="event_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Type *</label>
+              <select
+                id="event_type"
+                bind:value={formData.event_type}
+                on:change={handleEventTypeChange}
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+                class:border-red-500={errors.event_type}
+                required
+              >
+                {#each eventTypes as eventType}
+                  <option value={eventType}>{eventType}</option>
+                {/each}
+              </select>
+              {#if errors.event_type}
+                <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.event_type}</p>
+              {/if}
+            </div>
+            {#if formData.event_type === 'War'}
+            <div>
+              <label for="war_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">War Type</label>
+              <select
+                id="war_type"
+                bind:value={formData.war_role}
+                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+              >
+                <option value="Unspecified">Unspecified</option>
+                <option value="Attack">Attack</option>
+                <option value="Defense">Defense</option>
+              </select>
+            </div>
+            {/if}
+          </div>
         </div>
         
         <!-- Character (server inferred) -->
@@ -477,6 +496,24 @@
               <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.character_id}</p>
             {/if}
         </div>
+
+        {#if formData.event_type === 'War'}
+        <!-- War Role -->
+        <div>
+          <label for="war_role" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            War Role
+          </label>
+          <select
+            id="war_role"
+            bind:value={formData.war_role}
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+          >
+            <option value="Unspecified">Unspecified</option>
+            <option value="Attack">Attack</option>
+            <option value="Defense">Defense</option>
+          </select>
+        </div>
+        {/if}
         
         <!-- Event Time and Participation Status -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

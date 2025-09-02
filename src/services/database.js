@@ -210,6 +210,7 @@ class DatabaseService {
         this.migrateEventTemplatesPruneLegacy()
         this.migrateEventsDropParticipationCheck()
         this.migrateEventTemplatesDropParticipationCheck()
+        this.migrateEventsAddWarRole()
         this.migrateCharactersAddSteamAccount()
 
         // Seed default participation statuses if none exist
@@ -217,6 +218,18 @@ class DatabaseService {
 
         // Note: Default tasks are no longer automatically inserted to keep the app clean
         // Users can manually add tasks or import data if needed
+    }
+
+    migrateEventsAddWarRole() {
+        try {
+            const cols = this.db.prepare("PRAGMA table_info('events')").all()
+            const hasWarRole = cols.some(c => c.name === 'war_role')
+            if (!hasWarRole) {
+                this.db.exec("ALTER TABLE events ADD COLUMN war_role TEXT DEFAULT 'Unspecified'")
+            }
+        } catch (e) {
+            console.warn('Events add war_role migration skipped:', e)
+        }
     }
 
     migrateEventTemplatesAddPayload() {

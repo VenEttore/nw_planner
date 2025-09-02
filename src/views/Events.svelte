@@ -155,6 +155,16 @@
     }
     return colors[eventType] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
   }
+
+  function eventTypeWithWar(ev) {
+    const t = ev?.event_type || ''
+    if (t === 'War') {
+      const role = (ev.war_role || ev.war_type || 'Unspecified')
+      if (role && role !== 'Unspecified') return `War (${role})`
+      return 'War'
+    }
+    return t
+  }
 </script>
 
 <div class="max-w-7xl mx-auto">
@@ -226,7 +236,7 @@
                 <div class="flex items-center gap-2 mb-1">
                   <h3 class="text-base font-semibold text-gray-900 dark:text-white">{event.name}</h3>
                   <span class="text-xs px-2 py-1 rounded-full {getEventTypeColor(event.event_type)}">
-                    {event.event_type}
+                    {eventTypeWithWar(event)}
                   </span>
                 </div>
                 
@@ -293,7 +303,7 @@
                   <div class="flex items-center gap-2 mb-1">
                     <h3 class="text-base font-semibold text-gray-900 dark:text-white">{event.name}</h3>
                     <span class="text-xs px-2 py-1 rounded-full {getEventTypeColor(event.event_type)}">
-                      {event.event_type}
+                      {eventTypeWithWar(event)}
                     </span>
                   </div>
                   <div class="text-xs text-gray-600 dark:text-gray-400">
