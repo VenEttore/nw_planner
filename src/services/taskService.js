@@ -93,6 +93,11 @@ class TaskService {
                 WHERE character_id = ? AND reset_period = ?
                   AND task_id IN (SELECT id FROM tasks WHERE type = ?)
             `),
+            deleteCompletionsForTypeSimple: await this.db.prepare(`
+                DELETE FROM task_completions
+                WHERE character_id = ?
+                  AND task_id IN (SELECT id FROM tasks WHERE type = ?)
+            `),
             
             // Statistics
             getTaskStats: await this.db.prepare(`
@@ -369,6 +374,14 @@ class TaskService {
         return true
     }
 
+    // Simple clear: remove all completions for a character by task type (daily/weekly)
+    async clearCompletionsForCharacterByType(characterId, taskType) {
+        await this.ensureInitialized()
+        if (taskType !== 'daily' && taskType !== 'weekly') return false
+        const res = this.statements.deleteCompletionsForTypeSimple.run(characterId, taskType)
+        return res.changes >= 0
+    }
+
     // Helper methods
     getTaskType(taskId) {
         const row = this.statements.getTaskTypeById.get(taskId)
@@ -397,31 +410,28 @@ class TaskService {
         const H = parseInt(pick('hour'), 10)
         if (taskType === 'weekly') {
             // Determine weekly period anchored at Tuesday 05:00 in server timezone
-            // Get server-local weekday and YMD parts
+            // Token format: anchor Tuesday local date (YYYY-MM-DD)
             const weekdayStr = new Intl.DateTimeFormat('en-US', { timeZone: serverTimezone, weekday: 'short' }).format(now)
             const map = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 }
             const dayNum = map[weekdayStr]
-
-            // Tuesday of the current server-local week (midnight base in UTC for stable math)
             const dateOnlyFmt = new Intl.DateTimeFormat('en-CA', { timeZone: serverTimezone, year: 'numeric', month: '2-digit', day: '2-digit' })
             const dateParts = dateOnlyFmt.formatToParts(now)
-            const cy = parseInt(dateParts.find(p => p.type === 'year').value, 10)
-            const cm = parseInt(dateParts.find(p => p.type === 'month').value, 10)
-            const cd = parseInt(dateParts.find(p => p.type === 'day').value, 10)
-
-            const deltaToTuesday = (dayNum - 2 + 7) % 7
-            const tuesdayUTC = new Date(Date.UTC(cy, cm - 1, cd))
-            tuesdayUTC.setUTCDate(tuesdayUTC.getUTCDate() - deltaToTuesday)
-
-            // If it's Tuesday but before 05:00 server-local, use previous week's Tuesday
+            let cy = parseInt(dateParts.find(p => p.type === 'year').value, 10)
+            let cm = parseInt(dateParts.find(p => p.type === 'month').value, 10)
+            let cd = parseInt(dateParts.find(p => p.type === 'day').value, 10)
+            const deltaFromTuesday = (dayNum - 2 + 7) % 7 // days since last Tuesday
+            // Compute last Tuesday local date by subtracting deltaFromTuesday days
+            const base = new Date(Date.UTC(cy, cm - 1, cd))
+            base.setUTCDate(base.getUTCDate() - deltaFromTuesday)
+            // If it's Tuesday but before 05:00 server-local, use previous Tuesday
             const beforeFiveOnTuesday = (dayNum === 2 && H < 5)
             if (beforeFiveOnTuesday) {
-                tuesdayUTC.setUTCDate(tuesdayUTC.getUTCDate() - 7)
+                base.setUTCDate(base.getUTCDate() - 7)
             }
-
-            const year = tuesdayUTC.getUTCFullYear()
-            const weekNumber = this.getWeekNumber(tuesdayUTC)
-            return `${year}-W${weekNumber.toString().padStart(2, '0')}`
+            const ay = base.getUTCFullYear()
+            const am = base.getUTCMonth() + 1
+            const ad = base.getUTCDate()
+            return `${ay}-${String(am).padStart(2,'0')}-${String(ad).padStart(2,'0')}`
         }
         // Daily token: if before 05:00 server-local, use previous local day
         if (H >= 5) {
@@ -438,11 +448,26 @@ class TaskService {
     getLocalResetPeriod(taskType) {
         const now = new Date()
         if (taskType === 'weekly') {
-            const weekStart = this.getTuesdayFiveAMOfWeek(now)
-            const effective = now >= weekStart ? now : this.addDays(weekStart, -7)
-            const year = effective.getFullYear()
-            const weekNumber = this.getWeekNumber(effective)
-            return `${year}-W${weekNumber.toString().padStart(2, '0')}`
+            // Local weekly token also uses anchor Tuesday local date
+            const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(now)
+            const map = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 }
+            const dayNum = map[weekday]
+            const fmtDate = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' })
+            const parts = fmtDate.formatToParts(now)
+            const y = parseInt(parts.find(p => p.type==='year').value, 10)
+            const m = parseInt(parts.find(p => p.type==='month').value, 10)
+            const d = parseInt(parts.find(p => p.type==='day').value, 10)
+            const deltaFromTuesday = (dayNum - 2 + 7) % 7
+            const base = new Date(Date.UTC(y, m - 1, d))
+            base.setUTCDate(base.getUTCDate() - deltaFromTuesday)
+            const H = now.getHours()
+            if (dayNum === 2 && H < 5) {
+                base.setUTCDate(base.getUTCDate() - 7)
+            }
+            const ay = base.getUTCFullYear()
+            const am = base.getUTCMonth() + 1
+            const ad = base.getUTCDate()
+            return `${ay}-${String(am).padStart(2,'0')}-${String(ad).padStart(2,'0')}`
         }
         // Daily: use OS local wall clock parts, 05:00 boundary
         const fmt = new Intl.DateTimeFormat('en-CA', {

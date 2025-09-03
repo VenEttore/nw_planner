@@ -231,7 +231,7 @@ class ResetTimerService {
         }
         const dailyPeriod = `${dailyY}-${String(dailyM).padStart(2,'0')}-${String(dailyD).padStart(2,'0')}`
 
-        // Weekly period anchored to Tuesday 05:00 server-local
+        // Weekly period anchored to Tuesday 05:00 server-local (token = Tuesday YYYY-MM-DD)
         const weekdayStr = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(now)
         const map = { Sun:0, Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6 }
         const dayNum = map[weekdayStr]
@@ -247,9 +247,10 @@ class ResetTimerService {
         if (beforeFiveOnTuesday) {
             tuesdayUTC.setUTCDate(tuesdayUTC.getUTCDate() - 7)
         }
-        const weeklyYear = tuesdayUTC.getUTCFullYear()
-        const weeklyWeek = this.getWeekNumber(tuesdayUTC)
-        const weeklyPeriod = `${weeklyYear}-W${weeklyWeek.toString().padStart(2, '0')}`
+        const wy = tuesdayUTC.getUTCFullYear()
+        const wm = tuesdayUTC.getUTCMonth() + 1
+        const wd = tuesdayUTC.getUTCDate()
+        const weeklyPeriod = `${wy}-${String(wm).padStart(2,'0')}-${String(wd).padStart(2,'0')}`
 
         return { daily: dailyPeriod, weekly: weeklyPeriod }
     }

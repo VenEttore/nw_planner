@@ -15,6 +15,7 @@ let serverService
 let eventTemplateService
 let participationStatusService
 let steamAccountService
+let resetSchedulerInterval = null
 
 // Import services
 async function initializeServices() {
@@ -440,6 +441,52 @@ function createWindow() {
 app.whenReady().then(async () => {
     await initializeServices()
     setupIpcHandlers()
+    // Start reset scheduler (hourly, aligned to top of hour)
+    try {
+        const runResetTick = async () => {
+            try {
+                const chars = await characterService.getActive()
+                let shouldReload = false
+                for (const ch of chars) {
+                    if (!ch?.server_timezone) continue
+                    const weekday = new Intl.DateTimeFormat('en-US', { timeZone: ch.server_timezone, weekday: 'short' }).format(new Date())
+                    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: ch.server_timezone, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
+                    const H = parseInt(parts.find(p => p.type === 'hour').value, 10)
+                    const M = parseInt(parts.find(p => p.type === 'minute').value, 10)
+                    if (H === 5 && M === 0) {
+                        try { await taskService.clearCompletionsForCharacterByType(ch.id, 'daily') } catch {}
+                        if (weekday === 'Tue') {
+                            try { await taskService.clearCompletionsForCharacterByType(ch.id, 'weekly') } catch {}
+                        }
+                        shouldReload = true
+                    }
+                }
+                if (shouldReload && mainWindow && mainWindow.webContents) {
+                    try { mainWindow.webContents.reloadIgnoringCache() } catch (_) { try { mainWindow.reload() } catch {} }
+                }
+            } catch (e) {
+                console.error('Reset scheduler tick failed:', e)
+            }
+        }
+
+        const scheduleHourly = () => {
+            try {
+                if (resetSchedulerInterval) { clearInterval(resetSchedulerInterval); resetSchedulerInterval = null }
+                const now = new Date()
+                const msToNextHour = (60 - now.getMinutes()) * 60000 - now.getSeconds() * 1000 - now.getMilliseconds()
+                setTimeout(() => {
+                    runResetTick()
+                    resetSchedulerInterval = setInterval(runResetTick, 60 * 60 * 1000)
+                }, Math.max(msToNextHour, 1000))
+            } catch (e) {
+                console.error('Failed to schedule reset scheduler:', e)
+            }
+        }
+
+        scheduleHourly()
+    } catch (e) {
+        console.error('Failed to start reset scheduler:', e)
+    }
     createWindow()
     
     app.on('activate', () => {
@@ -451,6 +498,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
+        if (resetSchedulerInterval) { try { clearInterval(resetSchedulerInterval) } catch {} resetSchedulerInterval = null }
         if (database) {
             database.close()
         }
@@ -459,6 +507,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+    if (resetSchedulerInterval) { try { clearInterval(resetSchedulerInterval) } catch {} resetSchedulerInterval = null }
     if (database) {
         database.close()
     }
