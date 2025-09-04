@@ -3,6 +3,7 @@
   import api from '../services/api.js'
   import CharacterModal from '../components/CharacterModal.svelte'
   import SteamAccountManager from '../components/SteamAccountManager.svelte'
+  import FactionIcon from '../components/FactionIcon.svelte'
   
   let loading = true
   let characters = []
@@ -93,7 +94,10 @@
       {#each characters as character}
         <div class="card">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{character.name}</h3>
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <FactionIcon faction={character.faction} size={18} />
+              {character.name}
+            </h3>
             <div class="flex items-center space-x-2">
               <button
                 on:click={() => toggleActiveStatus(character)}

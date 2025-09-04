@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte'
   import api from '../services/api.js'
+  import FactionSelect from './FactionSelect.svelte'
   
   export let isOpen = false
   export let character = null // null for create, character object for edit
@@ -288,17 +289,7 @@
             <label for="faction" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Faction
             </label>
-            <select
-              id="faction"
-              bind:value={formData.faction}
-              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-nw-blue dark:bg-gray-700 dark:text-white"
-              class:border-red-500={errors.faction}
-            >
-              <option value="Factionless">Factionless</option>
-              <option value="Marauders">Marauders</option>
-              <option value="Covenant">Covenant</option>
-              <option value="Syndicate">Syndicate</option>
-            </select>
+            <FactionSelect bind:value={formData.faction} />
             {#if errors.faction}
               <p class="mt-1 text-sm text-red-600">{errors.faction}</p>
             {/if}

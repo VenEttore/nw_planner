@@ -6,6 +6,7 @@
   import interactionPlugin from '@fullcalendar/interaction'
   import api from '../services/api.js'
   import { selectedCharacters } from '../stores/ui.js'
+  import FactionIcon from '../components/FactionIcon.svelte'
   import EventModal from '../components/EventModal.svelte'
   
   let calendarEl
@@ -440,10 +441,13 @@
             {#each filteredCharacters as character}
               {@const active = selectedCharacterIds.includes(character.id)}
               <span role="button" tabindex="0" aria-pressed={active} title={character.name}
-                class="chip cursor-pointer select-none px-2 py-0.5 text-xs rounded-full border transition-colors {active ? 'bg-nw-blue text-white border-nw-blue' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'}"
+                class="chip cursor-pointer select-none px-2 py-0.5 text-xs rounded-full border transition-colors overflow-hidden max-w-[12rem] {active ? 'bg-nw-blue text-white border-nw-blue' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'}"
                 on:click={() => { const s = new Set(selectedCharacterIds); if (s.has(character.id)) s.delete(character.id); else s.add(character.id); applySelection(Array.from(s)) }}
                 on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const s = new Set(selectedCharacterIds); if (s.has(character.id)) s.delete(character.id); else s.add(character.id); applySelection(Array.from(s)) } }}>
-                {character.name}
+                <span class="inline-flex items-center gap-1 min-w-0">
+                  <FactionIcon faction={character.faction} size={12} />
+                  <span class="truncate">{character.name}</span>
+                </span>
               </span>
             {/each}
           </div>

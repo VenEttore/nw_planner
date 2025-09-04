@@ -129,6 +129,7 @@
 
   // Load templates when shown
   import api from '../services/api.js'
+  import CharacterSelect from './CharacterSelect.svelte'
   async function reloadTemplates(){
     try { templates = await api.getEventTemplates() } catch (_) { templates = [] }
   }
@@ -551,19 +552,9 @@
           {#if association_mode === 'byCharacter'}
           <div class="md:col-span-2">
             <label for="character_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Character *</label>
-            <select
-              id="character_id"
-              bind:value={formData.character_id}
-              on:change={handleCharacterChange}
-              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
-              class:border-red-500={errors.character_id}
-              required
-            >
-              <option value="">Select character</option>
-              {#each characters as character}
-                <option value={character.id}>{character.name} ({character.server_name})</option>
-              {/each}
-            </select>
+            <div class="w-full">
+              <CharacterSelect characters={characters} bind:value={formData.character_id} placeholder="Select character" on:change={handleCharacterChange} />
+            </div>
             {#if errors.character_id}
               <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.character_id}</p>
             {/if}

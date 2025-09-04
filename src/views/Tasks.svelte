@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte'
   import api from '../services/api.js'
   import TaskModal from '../components/TaskModal.svelte'
+  import FactionIcon from '../components/FactionIcon.svelte'
   import BatchAssignModal from '../components/BatchAssignModal.svelte'
   
   let loading = true
@@ -301,7 +302,10 @@
           <div class="w-72 shrink-0 card">
             <div class="flex items-center justify-between mb-2">
               <div>
-                <h3 class="font-semibold text-gray-900 dark:text-white">{c.name}</h3>
+                <h3 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <FactionIcon faction={c.faction} size={16} />
+                  {c.name}
+                </h3>
                 <p class="text-xs text-gray-500 dark:text-gray-400">{c.server_name}</p>
               </div>
             </div>

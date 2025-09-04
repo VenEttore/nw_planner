@@ -1,6 +1,6 @@
 {
   "name": "new-world-planner",
-  "version": "1.3.4",
+  "version": "1.4.0",
   "description": "A lightweight calendar and task management application for New World MMO players",
   "type": "module",
   "main": "electron/main.js",
@@ -35,7 +35,7 @@
     "autoprefixer": "^10.4.0",
     "concurrently": "^8.2.0",
     "cross-env": "^7.0.3",
-    "electron": "^28.0.0",
+    "electron": "^35.7.5",
     "electron-builder": "^24.0.0",
     "electron-rebuild": "^3.2.9",
     "icon-gen": "^5.0.0",

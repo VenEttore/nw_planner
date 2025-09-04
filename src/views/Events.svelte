@@ -4,6 +4,8 @@
   import EventModal from '../components/EventModal.svelte'
   import StatusSelect from '../components/StatusSelect.svelte'
   import TemplateManager from '../components/TemplateManager.svelte'
+  import FactionIcon from '../components/FactionIcon.svelte'
+  import CharacterSelect from '../components/CharacterSelect.svelte'
   import { currentView } from '../stores/ui'
   
   let loading = true
@@ -196,7 +198,7 @@
       </div>
       
       <!-- Filters -->
-      <div class="flex space-x-3">
+      <div class="flex space-x-3 items-center">
         <select bind:value={filterType} class="select-input text-sm">
           <option value="all">All Types</option>
           {#each eventTypes as type}
@@ -204,12 +206,15 @@
           {/each}
         </select>
         
-        <select bind:value={filterCharacter} class="select-input text-sm">
-          <option value="all">All Characters</option>
-          {#each characters as character}
-            <option value={character.id}>{character.name}</option>
-          {/each}
-        </select>
+        <div class="min-w-[220px]">
+          <CharacterSelect
+            characters={characters}
+            bind:value={filterCharacter}
+            includeAll={true}
+            allLabel="All Characters"
+            placeholder="All Characters"
+          />
+        </div>
       </div>
     </div>
     
@@ -233,7 +238,7 @@
                 
                 <!-- Event Details -->
                 <div class="text-xs text-gray-600 dark:text-gray-400">
-                  <div class="flex items-center gap-3">
+                  <div class="flex items-center gap-3 overflow-hidden">
                     <span>📅 {timeData.date} at {timeData.time}</span>
                     {#if event.server_name}
                       <span>🌐 {event.server_name}</span>

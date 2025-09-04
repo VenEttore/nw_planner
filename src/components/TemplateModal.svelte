@@ -6,6 +6,7 @@
   export let characters = []
 
   const dispatch = createEventDispatcher()
+  import CharacterSelect from './CharacterSelect.svelte'
 
   const eventTypes = ['War','Invasion','Company Event','PvE','PvP','Custom']
   const participationStatuses = ['Signed Up','Confirmed','Tentative','Absent']
@@ -94,12 +95,7 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preferred Character (optional)</label>
-          <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={form.character_id}>
-            <option value="">(none)</option>
-            {#each characters as c}
-              <option value={c.id}>{c.name} ({c.server_name})</option>
-            {/each}
-          </select>
+          <CharacterSelect characters={characters} bind:value={form.character_id} placeholder="(none)" />
         </div>
 
         <div>
