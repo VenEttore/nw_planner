@@ -178,21 +178,12 @@
       <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-nw-blue"></div>
     </div>
   {:else}
-    {#if characters.length === 0}
-    <div class="mb-4 rounded-md border border-yellow-300 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20 p-3">
-      <p class="text-sm text-yellow-900 dark:text-yellow-200">
-        You need at least one character before creating events. 
-        <button class="underline text-nw-blue hover:text-nw-blue-dark" on:click={() => currentView.set('characters')}>
-          Create your first character →
-        </button>
-      </p>
-    </div>
-    {/if}
+    <!-- Character no longer required to create events; association can be by server or none -->
 
     <!-- Action Bar -->
     <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
       <div class="flex space-x-2">
-        <button class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed" disabled={characters.length === 0} title={characters.length===0 ? 'Create a character first' : ''} on:click={openCreate}>Add New Event</button>
+        <button class="btn-primary" on:click={openCreate}>Add New Event</button>
         <div class="relative">
           <select class="btn-secondary text-sm px-3 py-2" on:focus={reloadTemplatesList} on:click={reloadTemplatesList} on:change={(e)=>{ const tplId = e.target.value; if (!tplId) return; pendingTemplateId = tplId; openCreate(); e.target.value=''; }}>
             <option value="">New from Template…</option>

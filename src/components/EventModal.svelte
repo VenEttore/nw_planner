@@ -182,6 +182,10 @@
       notification_minutes: typeof source.notification_minutes === 'number' ? source.notification_minutes : formData.notification_minutes,
       timezone: formData.timezone
     }
+    // Derive association after template apply
+    if (formData.character_id) { association_mode = 'byCharacter'; syncServerFromCharacter() }
+    else if (formData.server_name) { association_mode = 'byServer'; const s = servers.find(x => x.name === formData.server_name); if (s) formData.timezone = s.timezone || formData.timezone }
+    else { association_mode = 'none' }
 
     // Compute event_time from timing strategy if provided in payload
     if (source.time_strategy) {
