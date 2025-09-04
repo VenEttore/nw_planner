@@ -142,6 +142,7 @@ class DatabaseService {
                 recurring_pattern TEXT,
                 notification_enabled BOOLEAN DEFAULT 1,
                 notification_minutes INTEGER DEFAULT 30,
+                war_type TEXT DEFAULT 'Unspecified',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `)
@@ -211,6 +212,7 @@ class DatabaseService {
         this.migrateEventsDropParticipationCheck()
         this.migrateEventTemplatesDropParticipationCheck()
         this.migrateEventsAddWarRole()
+        this.migrateEventsAddWarTypeAndBackfill()
         this.migrateCharactersAddSteamAccount()
 
         // Seed default participation statuses if none exist
@@ -229,6 +231,24 @@ class DatabaseService {
             }
         } catch (e) {
             console.warn('Events add war_role migration skipped:', e)
+        }
+    }
+
+    migrateEventsAddWarTypeAndBackfill() {
+        try {
+            const cols = this.db.prepare("PRAGMA table_info('events')").all()
+            const hasWarType = cols.some(c => c.name === 'war_type')
+            if (!hasWarType) {
+                this.db.exec("ALTER TABLE events ADD COLUMN war_type TEXT DEFAULT 'Unspecified'")
+            }
+            // Backfill war_type from war_role when available
+            try {
+                this.db.exec(`UPDATE events SET war_type = COALESCE(war_role, war_type, 'Unspecified') WHERE war_type IS NULL OR war_type = ''`)
+            } catch (e) {
+                console.warn('Events war_type backfill skipped:', e)
+            }
+        } catch (e) {
+            console.warn('Events add/backfill war_type migration skipped:', e)
         }
     }
 

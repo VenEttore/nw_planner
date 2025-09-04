@@ -16,12 +16,12 @@ class EventService {
         // Prepare all SQL statements for better performance
         this.statements = {
             insertEvent: await this.db.prepare(`
-                INSERT INTO events (name, description, event_type, server_name, event_time, timezone, character_id, participation_status, location, recurring_pattern, notification_enabled, notification_minutes, war_role)
+                INSERT INTO events (name, description, event_type, server_name, event_time, timezone, character_id, participation_status, location, recurring_pattern, notification_enabled, notification_minutes, war_type)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `),
             updateEvent: await this.db.prepare(`
                 UPDATE events 
-                SET name = ?, description = ?, event_type = ?, server_name = ?, event_time = ?, timezone = ?, character_id = ?, participation_status = ?, location = ?, recurring_pattern = ?, notification_enabled = ?, notification_minutes = ?, war_role = ?
+                SET name = ?, description = ?, event_type = ?, server_name = ?, event_time = ?, timezone = ?, character_id = ?, participation_status = ?, location = ?, recurring_pattern = ?, notification_enabled = ?, notification_minutes = ?, war_type = ?
                 WHERE id = ?
             `),
             deleteEvent: await this.db.prepare('DELETE FROM events WHERE id = ?'),
@@ -110,9 +110,12 @@ class EventService {
             recurring_pattern,
             notification_enabled,
             notification_minutes,
+            war_type,
             war_role
         } = eventData
         
+        const effectiveWarType = (war_type || war_role || 'Unspecified')
+
         const result = this.statements.insertEvent.run(
             name,
             description || null,
@@ -126,7 +129,7 @@ class EventService {
             recurring_pattern || null,
             (notification_enabled !== undefined ? (notification_enabled ? 1 : 0) : 1),
             (typeof notification_minutes === 'number' ? notification_minutes : 30),
-            (war_role || 'Unspecified')
+            effectiveWarType
         )
         
         if (result.changes > 0) {
@@ -152,9 +155,12 @@ class EventService {
             recurring_pattern,
             notification_enabled,
             notification_minutes,
+            war_type,
             war_role
         } = eventData
         
+        const effectiveWarType = (war_type || war_role || 'Unspecified')
+
         const result = this.statements.updateEvent.run(
             name,
             description || null,
@@ -168,7 +174,7 @@ class EventService {
             recurring_pattern || null,
             (notification_enabled !== undefined ? (notification_enabled ? 1 : 0) : 1),
             (typeof notification_minutes === 'number' ? notification_minutes : 30),
-            (war_role || 'Unspecified'),
+            effectiveWarType,
             id
         )
         

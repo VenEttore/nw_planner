@@ -159,7 +159,7 @@
   function eventTypeWithWar(ev) {
     const t = ev?.event_type || ''
     if (t === 'War') {
-      const role = (ev.war_role || ev.war_type || 'Unspecified')
+      const role = (ev.war_type || ev.war_role || 'Unspecified')
       if (role && role !== 'Unspecified') return `War (${role})`
       return 'War'
     }
