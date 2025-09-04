@@ -96,7 +96,7 @@
       notification_enabled: editingEvent.notification_enabled !== false,
       notification_minutes: editingEvent.notification_minutes || 30,
       timezone: editingEvent.timezone || '',
-      war_role: editingEvent.war_role || 'Unspecified'
+      war_role: (editingEvent.war_type || editingEvent.war_role || 'Unspecified')
     }
     if (formData.character_id) association_mode = 'byCharacter'
     else if (formData.server_name) association_mode = 'byServer'

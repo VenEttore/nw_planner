@@ -545,9 +545,8 @@ class DatabaseService {
 
     insertDefaultParticipationStatuses() {
         try {
-            const ensure = this.db.prepare('SELECT 1 FROM participation_statuses WHERE slug = ?')
             const insert = this.db.prepare(`
-                INSERT INTO participation_statuses (name, slug, color_bg, color_text, sort_order, is_absent)
+                INSERT OR IGNORE INTO participation_statuses (name, slug, color_bg, color_text, sort_order, is_absent)
                 VALUES (?, ?, ?, ?, ?, ?)
             `)
             const rows = [
@@ -559,7 +558,7 @@ class DatabaseService {
                 ['Cancelled', 'cancelled', 'bg-gray-50 border-gray-200', 'text-gray-800', 50, 1]
             ]
             const tx = this.db.transaction(() => {
-                for (const r of rows) { if (!ensure.get(r[1])) insert.run(...r) }
+                for (const r of rows) { insert.run(...r) }
             })
             tx()
         } catch (e) {
