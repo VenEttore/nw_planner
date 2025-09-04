@@ -214,6 +214,7 @@ class DatabaseService {
         this.migrateEventsAddWarRole()
         this.migrateEventsAddWarTypeAndBackfill()
         this.migrateCharactersAddSteamAccount()
+        this.migrateEventsBackfillServerFromCharacter()
 
         // Seed default participation statuses if none exist
         this.insertDefaultParticipationStatuses()
@@ -231,6 +232,33 @@ class DatabaseService {
             }
         } catch (e) {
             console.warn('Events add war_role migration skipped:', e)
+        }
+    }
+
+    migrateEventsBackfillServerFromCharacter() {
+        try {
+            // Backfill server_name where missing from characters
+            this.db.exec(`
+                UPDATE events
+                SET server_name = (
+                    SELECT characters.server_name FROM characters WHERE characters.id = events.character_id
+                )
+                WHERE character_id IS NOT NULL AND (server_name IS NULL OR server_name = '')
+            `)
+        } catch (e) {
+            console.warn('Events backfill server_name skipped:', e)
+        }
+        try {
+            // Backfill timezone where missing from characters
+            this.db.exec(`
+                UPDATE events
+                SET timezone = COALESCE((
+                    SELECT characters.server_timezone FROM characters WHERE characters.id = events.character_id
+                ), timezone)
+                WHERE character_id IS NOT NULL AND (timezone IS NULL OR timezone = '')
+            `)
+        } catch (e) {
+            console.warn('Events backfill timezone skipped:', e)
         }
     }
 
