@@ -497,23 +497,7 @@
             {/if}
         </div>
 
-        {#if formData.event_type === 'War'}
-        <!-- War Role -->
-        <div>
-          <label for="war_role" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            War Role
-          </label>
-          <select
-            id="war_role"
-            bind:value={formData.war_role}
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
-          >
-            <option value="Unspecified">Unspecified</option>
-            <option value="Attack">Attack</option>
-            <option value="Defense">Defense</option>
-          </select>
-        </div>
-        {/if}
+        
         
         <!-- Event Time and Participation Status -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
