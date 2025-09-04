@@ -38,6 +38,9 @@
   let templates = []
   let selectedTemplateId = ''
   export let initialTemplateId = null
+  let servers = []
+  let association_mode = 'byCharacter' // 'byCharacter' | 'byServer' | 'none'
+  $: canUseServerTime = (association_mode === 'byCharacter' && !!formData.character_id) || (association_mode === 'byServer' && !!formData.server_name)
   
   // Event types
   const eventTypes = [
@@ -95,6 +98,9 @@
       timezone: editingEvent.timezone || '',
       war_role: editingEvent.war_role || 'Unspecified'
     }
+    if (formData.character_id) association_mode = 'byCharacter'
+    else if (formData.server_name) association_mode = 'byServer'
+    else association_mode = 'none'
     isValid = true
     timeMode = 'local'
   }
@@ -104,20 +110,21 @@
       name: '',
       description: '',
       event_type: 'Custom',
-      server_name: characters.length > 0 ? characters[0].server_name : '',
+      server_name: '',
       event_time: '',
-      character_id: characters.length > 0 ? characters[0].id : null,
+      character_id: null,
       participation_status: 'Signed Up',
       location: '',
       recurring_pattern: null,
       notification_enabled: true,
       notification_minutes: 30,
-      timezone: characters.length > 0 ? characters[0].server_timezone : Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       war_role: 'Unspecified'
     }
     errors = {}
     isValid = true
     timeMode = 'local'
+    association_mode = characters.length > 0 ? 'byCharacter' : 'none'
   }
 
   // Load templates when shown
@@ -126,6 +133,12 @@
     try { templates = await api.getEventTemplates() } catch (_) { templates = [] }
   }
   $: if (show) { (async ()=>{ await reloadTemplates() })() }
+
+  // Load servers when shown
+  async function loadServers(){
+    try { servers = await api.getActiveServers() } catch (_) { servers = [] }
+  }
+  $: if (show) { (async ()=>{ await loadServers() })() }
 
   // Auto-apply initial template if provided on first show
   let appliedInitial = false
@@ -249,8 +262,14 @@
       errors.event_time = 'Event time is required'
     }
     
-    if (!formData.character_id) {
-      errors.character_id = 'Character selection is required'
+    if (association_mode === 'byCharacter') {
+      if (!formData.character_id) {
+        errors.character_id = 'Character selection is required'
+      }
+    } else if (association_mode === 'byServer') {
+      if (!formData.server_name) {
+        errors.server_name = 'Server selection is required'
+      }
     }
     
     // Note: allow editing past events; only require presence
@@ -270,12 +289,16 @@
       return
     }
     
-    // Determine timezone based on mode
+    // Determine timezone based on mode and association
     let effectiveTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
     if (timeMode === 'server') {
-      // Use selected character's server timezone
-      const character = characters.find(c => c.id === parseInt(formData.character_id))
-      effectiveTimezone = character?.server_timezone || formData.timezone || effectiveTimezone
+      if (association_mode === 'byCharacter') {
+        const character = characters.find(c => c.id === parseInt(formData.character_id))
+        effectiveTimezone = character?.server_timezone || formData.timezone || effectiveTimezone
+      } else if (association_mode === 'byServer') {
+        const server = servers.find(s => s.name === formData.server_name)
+        effectiveTimezone = server?.timezone || formData.timezone || effectiveTimezone
+      }
     } else {
       effectiveTimezone = formData.timezone || effectiveTimezone
     }
@@ -285,8 +308,20 @@
       ? zonedTimeToUtc(formData.event_time, effectiveTimezone).toISOString()
       : new Date(formData.event_time).toISOString()
 
-    // Ensure server fields are synced right before submit
-    syncServerFromCharacter()
+    // Ensure server fields reflect association right before submit
+    if (association_mode === 'byCharacter') {
+      syncServerFromCharacter()
+    } else if (association_mode === 'byServer') {
+      const server = servers.find(s => s.name === formData.server_name)
+      if (server) {
+        formData.server_name = server.name
+        formData.timezone = server.timezone || formData.timezone
+      }
+      formData.character_id = null
+    } else {
+      formData.character_id = null
+      formData.server_name = ''
+    }
 
     // Format event data for submission
     const eventData = {
@@ -332,6 +367,7 @@
   
   // Ensure server_name/timezone reflect the selected character
   function syncServerFromCharacter() {
+    if (association_mode !== 'byCharacter') return
     if (!formData?.character_id) return
     const character = characters.find(c => c.id === parseInt(formData.character_id))
     if (character) {
@@ -343,6 +379,15 @@
   // Auto-populate server name when character changes
   function handleCharacterChange() {
     syncServerFromCharacter()
+  }
+
+  function handleServerChange(e) {
+    const name = e?.target?.value || formData.server_name
+    const server = servers.find(s => s.name === name)
+    if (server) {
+      formData.server_name = server.name
+      formData.timezone = server.timezone || formData.timezone
+    }
   }
   
   // Get event type specific defaults
@@ -474,11 +519,34 @@
           </div>
         </div>
         
-        <!-- Character (server inferred) -->
-        <div>
-            <label for="character_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Character *
-            </label>
+        <!-- Association + Character/Server selection -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label for="assoc_mode" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Association</label>
+            <select
+              id="assoc_mode"
+              bind:value={association_mode}
+              on:change={(e)=>{
+                if (association_mode === 'byCharacter') {
+                  if (!formData.character_id && characters.length>0) { formData.character_id = characters[0].id; syncServerFromCharacter() }
+                } else if (association_mode === 'byServer') {
+                  formData.character_id = null
+                  if (!formData.server_name && servers.length>0) { formData.server_name = servers[0].name; handleServerChange({ target: { value: formData.server_name }}) }
+                } else {
+                  formData.character_id = null
+                  formData.server_name = ''
+                }
+              }}
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+            >
+              <option value="byCharacter">By Character</option>
+              <option value="byServer">By Server</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+          {#if association_mode === 'byCharacter'}
+          <div class="md:col-span-2">
+            <label for="character_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Character *</label>
             <select
               id="character_id"
               bind:value={formData.character_id}
@@ -495,6 +563,28 @@
             {#if errors.character_id}
               <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.character_id}</p>
             {/if}
+          </div>
+          {:else if association_mode === 'byServer'}
+          <div class="md:col-span-2">
+            <label for="server_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Server *</label>
+            <select
+              id="server_name"
+              bind:value={formData.server_name}
+              on:change={handleServerChange}
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+              class:border-red-500={errors.server_name}
+              required
+            >
+              <option value="">Select server</option>
+              {#each servers as s}
+                <option value={s.name}>{s.name} ({s.region})</option>
+              {/each}
+            </select>
+            {#if errors.server_name}
+              <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.server_name}</p>
+            {/if}
+          </div>
+          {/if}
         </div>
 
         
@@ -510,7 +600,7 @@
                 <button type="button" class={`px-3 py-1 text-xs ${timeMode === 'local' ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`} on:click={() => timeMode = 'local'} aria-pressed={timeMode === 'local'}>
                   Local Time
                 </button>
-                <button type="button" class={`px-3 py-1 text-xs border-l border-gray-300 dark:border-gray-600 ${timeMode === 'server' ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`} on:click={() => timeMode = 'server'} aria-pressed={timeMode === 'server'}>
+                <button type="button" class={`px-3 py-1 text-xs border-l border-gray-300 dark:border-gray-600 ${timeMode === 'server' ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'} ${!canUseServerTime ? 'opacity-50 cursor-not-allowed' : ''}`} on:click={() => { if (canUseServerTime) timeMode = 'server' }} aria-pressed={timeMode === 'server'} disabled={!canUseServerTime}>
                   Server Time
                 </button>
               </div>
@@ -525,7 +615,13 @@
             />
             <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
               {#if timeMode === 'server'}
-                Using server timezone from character: {characters.find(c => c.id === parseInt(formData.character_id))?.server_timezone || formData.timezone}
+                {#if association_mode === 'byCharacter'}
+                  Using server timezone from character: {characters.find(c => c.id === parseInt(formData.character_id))?.server_timezone || formData.timezone}
+                {:else if association_mode === 'byServer'}
+                  Using selected server timezone: {servers.find(s => s.name === formData.server_name)?.timezone || formData.timezone}
+                {:else}
+                  Server time requires a character or server association.
+                {/if}
               {:else}
                 Using your local timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
               {/if}
