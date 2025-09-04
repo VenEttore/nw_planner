@@ -1155,6 +1155,74 @@ Notes & Scope
 - Future: filtering characters by Steam account on Characters/Tasks/Calendar views.
 
 
+### 9.13 War Rules — Warnings, Constraints, and Scheduling Guards (NEW)
+
+Objectives
+- Warn/prevent common war signup pitfalls leveraging Steam associations and war attack/defense distinctions.
+- Provide real-time guidance during event creation/editing, on the Events list, Calendar, Dashboard, and Characters views.
+- Keep data model minimal and non-destructive; warnings do not hard-block saves unless explicitly configured (phase 2).
+
+Rules to Enforce/Warn
+- Attack/Defense cap per character per day: at most one Attack and one Defense on the same war day (local rule: daily window is a calendar day; later can switch to server-local day if needed).
+- Steam-linked duplicates: two or more characters on the same Steam account signed up for the same war type (Attack or Defense) must be pre-slotted; otherwise signups will be rejected by the game. We surface a warning badge and explain resolution options.
+- Time collision: a single player cannot attend two wars at the same time; warn if overlapping windows occur for the same Steam account or for the same character.
+
+Data Model (additive)
+- No schema change required for core rules if we infer from existing fields:
+  - events: `event_type` (War), `war_type` (Attack|Defense|Unspecified), `event_time` (UTC), `character_id`, `server_name`, `timezone`.
+  - characters: `steam_account_id` (nullable), `server_timezone`.
+- Optional (phase 2): `events.war_slot_status` TEXT NULL ('pre-slotted'|'not-slotted') to allow the user to confirm pre-slotting and clear specific warnings.
+
+Derived Windows
+- War window duration: assume fixed 1 hour duration for conflict checks unless event end-time is later added. Use event_time → event_time + 60 minutes.
+- “Same war day” for caps: use server timezone if present via character or server; fallback to local timezone. Compute date token `YYYY-MM-DD` in that timezone.
+
+Services & Logic (Main process)
+- warRulesService.ts (new):
+  - getWarConflictsForEvent(dto): returns { caps: Conflict[], steamDupes: Conflict[], overlaps: Conflict[] }
+    - caps: other events for same character on same war day where war_type equals Attack (if creating Attack) or Defense (if creating Defense) and already one exists.
+    - steamDupes: other events for different characters with same `steam_account_id` and same war_type within the same window; mark as needs pre-slotting.
+    - overlaps: events for same character OR same steam_account_id where war windows overlap in time (±1h).
+  - getWarConflictsForRange(start, end): batch checker for Events/Calendar lists.
+  - Helpers: normalizeToTz(date, tz), warDayToken(date, tz), warWindow(start).
+- IPC
+  - `war:getConflictsForEvent`, `war:getConflictsForRange`.
+
+Renderer Integrations
+- EventModal.svelte
+  - On change of `event_type`, `war_type`, `character_id`, or `event_time`, call `war:getConflictsForEvent` (debounced) and render inline warnings:
+    - Cap reached: “This character already has a {war_type} on this war day.”
+    - Steam duplicate: “Multiple characters on Steam account for {war_type}. Pre-slotting required.”
+    - Overlap: “This player has another war at this time.”
+  - CTA suggestions: change character; change war_type; adjust time; mark as Pre-slotted (phase 2 if we add `war_slot_status`).
+- Events.svelte / Dashboard.svelte
+  - Row-level warning badges for War events with conflicts (computed via range API on load and after mutations).
+- Calendar.svelte
+  - Tooltip note for conflicts; optionally red border for overlapping conflicts.
+- Characters.svelte
+  - Show upcoming war caps/overlaps per character in the card details (small summary).
+
+UX Details
+- Warning badge styles: amber for caps/steam dupes; red for overlaps. Tooltips provide explanation.
+- Do not block submit in v1; show clear actionable text. Optionally add a “Prevent save with critical overlap” toggle in Settings (phase 2).
+
+Performance
+- Index queries by `event_type='War'`, `character_id`, `event_time`. Reuse existing indexes.
+- Batch range queries for list views; cache conflict summaries in-memory per session and invalidate on event CRUD.
+
+Testing Plan Additions
+- Unit-level: warRulesService given synthetic rows returns expected conflicts across DST and different timezones.
+- EventModal: changing inputs triggers warnings; saving does not break; reopening reflects same guidance.
+- List views: badges appear/disappear when events added/edited/deleted.
+- Steam-linked dupes: creating two Attack wars at similar times for characters with same steam_account_id yields pre-slot warning.
+- Caps: second Attack (or Defense) on same war day for same character yields cap warning.
+- Overlap: any overlapping window across same character or same steam account yields red overlap warning.
+
+Scope & Follow-ups
+- Phase 1 (this branch): warnings only, no hard validation; no schema changes.
+- Phase 2 (optional): add `war_slot_status`, Settings toggles to enforce hard blocks, per-event override notes.
+
+
 ## 10. Comprehensive Testing Protocol
 
 ### 10.1 Pre-Test Setup
