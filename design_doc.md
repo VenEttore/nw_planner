@@ -1174,18 +1174,18 @@ Data Model (additive)
 - Optional (phase 2): `events.war_slot_status` TEXT NULL ('pre-slotted'|'not-slotted') to allow the user to confirm pre-slotting and clear specific warnings.
 
 Derived Windows
-- War window duration: assume fixed 1 hour duration for conflict checks unless event end-time is later added. Use event_time → event_time + 60 minutes.
+- War window duration: 45 minutes total, covering 15 minutes of pre-pull plus 30 minutes of war time. Window = [event_time − 15 minutes, event_time + 30 minutes].
 - “Same war day” for caps: use server timezone if present via character or server; fallback to local timezone. Compute date token `YYYY-MM-DD` in that timezone.
 
 Services & Logic (Main process)
 - warRulesService.ts (new):
   - getWarConflictsForEvent(dto): returns { caps: Conflict[], steamDupes: Conflict[], overlaps: Conflict[] }
     - caps: other events for same character on same war day where war_type equals Attack (if creating Attack) or Defense (if creating Defense) and already one exists.
-    - steamDupes: other events for different characters with same `steam_account_id`, SAME `server_name`, and SAME `war_type` within the same window; mark as needs pre-slotting.
-    - overlaps: events for same character OR same steam_account_id where war windows overlap in time (±1h).
+    - steamDupes: other events for different characters with same `steam_account_id`, SAME `server_name`, and SAME `war_type` whose war windows intersect; mark as needs pre-slotting.
+    - overlaps: events for same character OR same steam_account_id where war windows intersect in time. Intervals are built as [start − 15m, start + 30m].
   - status semantics: load `participation_statuses` once (renderer cache or IPC call) and provide `isAbsentStatus(name)` using the `is_absent` flag; treat "Cancelled" as absent by default.
   - getWarConflictsForRange(start, end): batch checker for Events/Calendar lists.
-  - Helpers: normalizeToTz(date, tz), warDayToken(date, tz), warWindow(start).
+  - Helpers: normalizeToTz(date, tz), warDayToken(date, tz), warWindow(start) => { from: start − 15m, to: start + 30m }.
 - IPC
   - `war:getConflictsForEvent`, `war:getConflictsForRange`.
 
@@ -1230,7 +1230,7 @@ Testing Plan Additions
 - List views: badges appear/disappear when events added/edited/deleted.
 - Steam-linked dupes (refined): creating two Attack wars at similar times for characters with same steam_account_id AND same server yields pre-slot warning; changing one to different server clears the warning.
 - Caps: second Attack (or Defense) on same war day for same character yields cap warning.
-- Overlap: any overlapping window across same character or same steam account yields red overlap warning.
+- Overlap: any overlapping 45-minute window (start − 15m to start + 30m) across same character or same steam account yields overlap warning with severity logic applied.
 - Severity checks:
   - Overlap with one Confirmed + others non-absent → soft in UI and header panel.
   - Overlap with ≥2 Confirmed → hard; row + modal reflect hard state.
