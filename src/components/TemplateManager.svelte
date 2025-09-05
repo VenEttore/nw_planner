@@ -121,7 +121,28 @@
         {/if}
       </div>
 
-      <TemplateModal isOpen={showTemplateModal} template={editingTemplate} characters={characters} servers={servers} on:cancel={()=>{ showTemplateModal=false; editingTemplate=null }} on:save={async (e)=>{ try { const payload = { ...e.detail, payload_json: e.detail }; if (editingTemplate) await api.updateEventTemplate(editingTemplate.id, payload); else await api.createEventTemplate(payload); showTemplateModal=false; editingTemplate=null; await load(); dispatch('changed') } catch (err) { console.error('Template save failed', err) } }} />
+      <TemplateModal
+        isOpen={showTemplateModal}
+        template={editingTemplate}
+        characters={characters}
+        servers={servers}
+        on:cancel={()=>{ showTemplateModal=false; editingTemplate=null }}
+        on:save={async (e)=>{
+          try {
+            // Persist a synchronized payload for easy apply
+            const p = { ...e.detail }
+            // Normalize association fields
+            if (p.association_mode === 'byCharacter') { p.server_name = ''; }
+            else if (p.association_mode === 'byServer') { p.character_id = ''; }
+            const payload = { ...p, payload_json: p }
+            if (editingTemplate) await api.updateEventTemplate(editingTemplate.id, payload)
+            else await api.createEventTemplate(payload)
+            showTemplateModal=false; editingTemplate=null; await load(); dispatch('changed')
+          } catch (err) {
+            console.error('Template save failed', err)
+          }
+        }}
+      />
     </div>
   </div>
 {/if}

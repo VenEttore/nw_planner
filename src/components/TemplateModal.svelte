@@ -4,6 +4,7 @@
   export let isOpen = false
   export let template = null // editing template or null
   export let characters = []
+  export let servers = []
 
   const dispatch = createEventDispatcher()
   import CharacterSelect from './CharacterSelect.svelte'
@@ -24,7 +25,9 @@
     notification_enabled: true,
     notification_minutes: 30,
     time_strategy: '', // 'relative' | 'fixed' | ''
-    time_params: {} // relative: { unit: 'hour'|'day'|'week' } ; fixed: { when: 'today'|'tomorrow'|'weekday', weekday?:0-6, timeOfDay:'HH:mm' }
+    time_params: {}, // relative: { unit: 'hour'|'day'|'week' } ; fixed: { when: 'today'|'tomorrow'|'weekday', weekday?:0-6, timeOfDay:'HH:mm' }
+    war_role: 'Unspecified',
+    association_mode: 'none' // 'byCharacter' | 'byServer' | 'none'
   }
 
   let initializedForKey = null
@@ -47,7 +50,9 @@
           notification_enabled: src.notification_enabled !== undefined ? !!src.notification_enabled : !!(template.notification_enabled || template.notification_enabled === 1),
           notification_minutes: typeof src.notification_minutes === 'number' ? src.notification_minutes : (typeof template.notification_minutes === 'number' ? template.notification_minutes : 30),
           time_strategy: template.time_strategy || '',
-          time_params: typeof template.time_params === 'string' ? JSON.parse(template.time_params) : (template.time_params || {})
+          time_params: typeof template.time_params === 'string' ? JSON.parse(template.time_params) : (template.time_params || {}),
+          war_role: src.war_role || src.war_type || 'Unspecified',
+          association_mode: src.association_mode || (src.character_id ? 'byCharacter' : (src.server_name ? 'byServer' : 'none'))
         }
       }
       } else {
@@ -93,9 +98,46 @@
           </div>
         </div>
 
+        {#if form.event_type === 'War'}
         <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preferred Character (optional)</label>
-          <CharacterSelect characters={characters} bind:value={form.character_id} placeholder="(none)" />
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">War Type</label>
+          <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={form.war_role}>
+            <option value="Unspecified">Unspecified</option>
+            <option value="Attack">Attack</option>
+            <option value="Defense">Defense</option>
+          </select>
+        </div>
+        {/if}
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Association</label>
+            <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={form.association_mode} on:change={(e)=>{
+              if (form.association_mode === 'byCharacter') { form.server_name=''; }
+              else if (form.association_mode === 'byServer') { form.character_id=''; }
+              else { form.character_id=''; form.server_name=''; }
+            }}>
+              <option value="none">None</option>
+              <option value="byCharacter">By Character</option>
+              <option value="byServer">By Server</option>
+            </select>
+          </div>
+          {#if form.association_mode === 'byCharacter'}
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preferred Character</label>
+              <CharacterSelect characters={characters} bind:value={form.character_id} placeholder="(none)" />
+            </div>
+          {:else if form.association_mode === 'byServer'}
+            <div class="md:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preferred Server</label>
+              <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white" bind:value={form.server_name}>
+                <option value="">(none)</option>
+                {#each servers as s}
+                  <option value={s.name}>{s.name} ({s.region})</option>
+                {/each}
+              </select>
+            </div>
+          {/if}
         </div>
 
         <div>
