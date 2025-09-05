@@ -1204,6 +1204,14 @@ Derived Windows
 - War window duration: 45 minutes total, covering 15 minutes of pre-pull plus 30 minutes of war time. Window = [event_time − 15 minutes, event_time + 30 minutes].
 - "Same war day" for caps: use server timezone if present via character or server; fallback to local timezone. Compute date token `YYYY-MM-DD` in that timezone.
 
+Server-only association (no character selected)
+- Because events can be created with association = "By Server" (no character yet), we still surface guidance:
+  - Always show a SOFT reminder banner in EventModal to verify character-level war limits (one Attack/Defense per day) and any pre-slotting requirements once the character is chosen.
+  - Overlap detection still runs: compare the new war's 45-minute window against all existing war events across the user's characters. Severity follows the normal policy based on participation statuses:
+    - One Confirmed vs others non-absent → SOFT; two or more Confirmed → HARD.
+  - Steam duplicate and cap checks are deferred until a character is selected (character_id present). Once chosen, re-run full checks immediately to show cap and same-steam same-server same-type (pre-slot) warnings if applicable.
+- Header notifications: server-only wars contribute a generic reminder ("Verify limits and pre-slots after choosing character") and any overlap warnings derived from existing events.
+
 Services & Logic (Main process)
 - warRulesService.ts (new):
   - getWarConflictsForEvent(dto): returns { caps: Conflict[], steamDupes: Conflict[], overlaps: Conflict[] }
@@ -1213,15 +1221,17 @@ Services & Logic (Main process)
   - status semantics: load `participation_statuses` once (renderer cache or IPC call) and provide `isAbsentStatus(name)` using the `is_absent` flag; treat "Cancelled" as absent by default.
   - getWarConflictsForRange(start, end): batch checker for Events/Calendar lists.
   - Helpers: normalizeToTz(date, tz), warDayToken(date, tz), warWindow(start) => { from: start − 15m, to: start + 30m }.
-- IPC
-  - `war:getConflictsForEvent`, `war:getConflictsForRange`.
+
+IPC
+- `war:getConflictsForEvent`, `war:getConflictsForRange`.
 
 Renderer Integrations
 - EventModal.svelte
   - On change of `event_type`, `war_type`, `character_id`, or `event_time`, call `war:getConflictsForEvent` (debounced) and render inline warnings:
-    - Cap reached: "This character already has a {war_type} on this war day."
-    - Steam duplicate: "Multiple characters on the same Steam account and server for {war_type}. Pre-slotting required."
-    - Overlap: "This player has another war at this time."
+    - Cap reached: "This character already has a {war_type} on this war day." (only when `character_id` present)
+    - Steam duplicate: "Multiple characters on the same Steam account and server for {war_type}. Pre-slotting required." (only when `character_id` present)
+    - Overlap: "This player has another war at this time." (always)
+  - When association is By Server (no character): show a SOFT reminder to verify limits and pre-slots after choosing a character; re-run full checks when a character is later selected.
   - CTA suggestions: change character; change war_type; adjust time; mark as Pre-slotted (phase 2 if we add `war_slot_status`).
 - Events.svelte / Dashboard.svelte
   - Row-level warning badges for War events with conflicts (computed via range API on load and after mutations).
@@ -1232,7 +1242,7 @@ Renderer Integrations
 
 Header Notifications
 - Add a notification bell in the header that opens a lightweight panel. The bell shows an unread count of active warnings across the currently loaded horizon (e.g., next 48h).
-- Panel sections: Caps (hard), Overlaps (soft/hard), Steam same-server type (soft). Each row links to the event or opens the modal.
+- Panel sections: Caps (hard), Overlaps (soft/hard), Steam same-server type (soft), and generic server-only reminders.
 - Future: funnel other system notifications through the same surface.
 
 UX Details
@@ -1246,6 +1256,7 @@ Severity Policy (App behavior)
   - If two or more are Confirmed → HARD warning.
   - Note: "non-absent" means status where `is_absent = 0`; absent includes statuses like "Absent" and "Cancelled".
 - Same-Steam + Same-Server + Same-War-Type (pre-slotting requirement): SOFT warning when two or more involved events have non-absent status.
+- Server-only (no character) cases always include a SOFT reminder to verify limits and pre-slots once a character is chosen; overlap warnings follow the same rules above based on event statuses.
 
 Performance
 - Index queries by `event_type='War'`, `character_id`, `event_time`. Reuse existing indexes.
@@ -1262,10 +1273,7 @@ Testing Plan Additions
   - Overlap with one Confirmed + others non-absent → soft in UI and header panel.
   - Overlap with ≥2 Confirmed → hard; row + modal reflect hard state.
   - Same-Steam+Server+Type with ≥2 non-absent → soft; absent statuses do not count.
-
-Scope & Follow-ups
-- Phase 1 (this branch): warnings only, no hard validation; no schema changes.
-- Phase 2 (optional): add `war_slot_status`, Settings toggles to enforce hard blocks, per-event override notes.
+- Server-only: verify the SOFT reminder shows consistently and that overlap detection still triggers with correct severities; confirm that selecting a character re-runs checks and may surface cap/steam-dupe warnings.
 
 
 ## 10. Comprehensive Testing Protocol
