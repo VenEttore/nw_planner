@@ -229,12 +229,28 @@
       location: source.location ?? formData.location,
       notification_enabled: source.notification_enabled !== undefined ? !!source.notification_enabled : formData.notification_enabled,
       notification_minutes: typeof source.notification_minutes === 'number' ? source.notification_minutes : formData.notification_minutes,
-      timezone: formData.timezone
+      timezone: formData.timezone,
+      war_role: (source.war_role ?? source.war_type ?? formData.war_role ?? 'Unspecified')
     }
-    // Derive association after template apply
-    if (formData.character_id) { association_mode = 'byCharacter'; syncServerFromCharacter() }
-    else if (formData.server_name) { association_mode = 'byServer'; const s = servers.find(x => x.name === formData.server_name); if (s) formData.timezone = s.timezone || formData.timezone }
-    else { association_mode = 'none' }
+    // Derive association after template apply, respecting explicit template hint
+    const assoc = source.association_mode
+    if (assoc === 'byCharacter') {
+      association_mode = 'byCharacter'
+      // Ensure server_name mirrors character if present
+      syncServerFromCharacter()
+    } else if (assoc === 'byServer') {
+      association_mode = 'byServer'
+      // Ensure timezone mirrors selected server if present
+      const s = servers.find(x => x.name === formData.server_name)
+      if (s) formData.timezone = s.timezone || formData.timezone
+      // Clear character to avoid mixed association
+      formData.character_id = null
+    } else {
+      // Fallback: infer from populated fields
+      if (formData.character_id) { association_mode = 'byCharacter'; syncServerFromCharacter() }
+      else if (formData.server_name) { association_mode = 'byServer'; const s = servers.find(x => x.name === formData.server_name); if (s) formData.timezone = s.timezone || formData.timezone }
+      else { association_mode = 'none' }
+    }
 
     // Compute event_time from timing strategy if provided in payload
     if (source.time_strategy) {
