@@ -106,7 +106,7 @@ Data Model & Migrations (UPDATED)
   - color_bg TEXT NOT NULL (chip/select field background class)
   - color_text TEXT NOT NULL (chip/select field text class)
   - sort_order INTEGER NOT NULL DEFAULT 0
-  - is_absent BOOLEAN NOT NULL DEFAULT 0 (for “Hide Absent” filters)
+  - is_absent BOOLEAN NOT NULL DEFAULT 0 (for "Hide Absent" filters)
 - Migration tasks:
   - Create `participation_statuses` with indexes (slug, sort_order).
   - Seed defaults (idempotent):
@@ -122,7 +122,7 @@ Single Source of Truth & Access Layer (UPDATED)
 - IPC: `status:getAll|create|update|delete`.
 - Renderer: `api.getParticipationStatuses()` + statusRegistry (in-memory store) with invalidate() after Settings changes.
 - Event row reconciliation pathway now standardized: after any RSVP change, call `api.getEventById(eventId)` and patch the list; when opening edit modals, await any pending save for that event and then fetch `getEventById` to initialize the form.
- - Service-level protections: attempts to edit/delete `no-status` are rejected. Delete supports optional remap; simple delete is allowed and won’t error.
+ - Service-level protections: attempts to edit/delete `no-status` are rejected. Delete supports optional remap; simple delete is allowed and won't error.
 
 Unified UI & Save Flow (UPDATED)
 - Shared `ParticipationStatusSelect` (thin): props { value, statuses, disabled, onChange(value) }.
@@ -136,7 +136,10 @@ Unified UI & Save Flow (UPDATED)
 
 Integration Points (UPDATED)
 - EventModal: native select for visual consistency with modal; opens with fresh `getEventById` snapshot.
-- Events page & Dashboard: shared colored selector component for closed state (colored by status); dropdown list remains neutral; “Hide Absent” consults `is_absent`.
+  - War form rules enforced (mandatory `war_type`, mandatory association and dependent field).
+  - `Unspecified` war type hidden for new events but displayed when present on legacy rows.
+  - Segmented control behavior: Server Time is disabled unless association is By Character with a selected `character_id` or By Server with a selected `server_name`; when association is None, Local Time is enforced and helper reflects that.
+- Events page & Dashboard: shared colored selector component for closed state (colored by status); dropdown list remains neutral; "Hide Absent" consults `is_absent`.
 - Calendar: reads status name for display; edits via EventModal.
 
 Settings UI
@@ -657,7 +660,7 @@ The Task system must deliver per-character, server-time-aware daily/weekly workf
 
 #### 9.4.1 Objectives
 - Per-character visibility via explicit assignment (with bulk helpers)
-- Accurate completion tracking by reset period using each character’s server timezone
+- Accurate completion tracking by reset period using each character's server timezone
 - Fast CRUD with priorities; scalable list UX
 - Clear reset behavior and streak semantics
 
@@ -724,9 +727,9 @@ initializeDefaultTasks(); // idempotent
     - Row 1 (horizontal scroll): character cards showing assigned Daily then Weekly tasks with quick-complete checkboxes. Mouse wheel scroll converts to horizontal scroll for usability.
     - Row 2 (vertical scroll): master Task Library as compact rows with small type/priority chips and Edit/Delete actions.
   - One-time tasks appear in Row 1 under a separate section when assigned; checking them immediately unassigns and removes them from that character
-  - Header quick actions: “Reset Daily” and “Reset Weekly”
+  - Header quick actions: "Reset Daily" and "Reset Weekly"
 - Dashboard
-  - “Today’s Tasks” from selected character(s) with checkboxes
+  - "Today's Tasks" from selected character(s) with checkboxes
   - Priority labels; completed styling
  
 - Notifications (optional)
@@ -777,7 +780,7 @@ These defaults are inserted idempotently on startup or via "Import Defaults" if 
 
 
 ### 9.5 Timezone & Reset Behaviour (UPDATED)
-Daily/weekly resets must follow each character’s server timezone (05:00 daily; Tuesday 05:00 weekly). Countdown timers and period tokens must be derived from server time, not local time.
+Daily/weekly resets must follow each character's server timezone (05:00 daily; Tuesday 05:00 weekly). Countdown timers and period tokens must be derived from server time, not local time.
 
 #### 9.5.1 Principles
 - Compute server-local reset instants, then convert to an absolute instant (UTC) before doing any subtraction.
@@ -791,14 +794,14 @@ Daily/weekly resets must follow each character’s server timezone (05:00 daily;
 
 #### 9.5.3 Service responsibilities
 - Reset timers (dashboard): use `getNextResetUTC` and compute `deltaMs = nextResetUTC.getTime() - Date.now()`; never mix server-local `Date` and local `Date` in subtraction.
-- Task service (periods): reuse the same boundary logic to compute period tokens per character’s server timezone; keep token generation server-local.
+- Task service (periods): reuse the same boundary logic to compute period tokens per character's server timezone; keep token generation server-local.
 - Keep a single timezone map; do not copy in multiple files.
 
-#### 9.5.4 Do/Don’t
+#### 9.5.4 Do/Don't
 - Do: normalize both instants to UTC before subtracting.
 - Do: derive server-local components via `formatToParts` to avoid locale string ambiguity.
-- Don’t: construct `new Date('YYYY-MM-DDTHH:mm:ss')` without timezone and treat it as server time (parses as local time).
-- Don’t: subtract a server-local `Date` from local `new Date()` directly.
+- Don't: construct `new Date('YYYY-MM-DDTHH:mm:ss')` without timezone and treat it as server time (parses as local time).
+- Don't: subtract a server-local `Date` from local `new Date()` directly.
 
 #### 9.5.5 Risks & Mitigations
 - Timezone math is error-prone without Temporal; stick to `Intl` + careful normalization. Consider adopting a lightweight library (e.g., `luxon`) if complexity grows.
@@ -846,9 +849,9 @@ Modal Backdrop Interaction (NEW)
 - Backdrop close requires mousedown and click on the backdrop element, preventing accidental closes when drag-selecting text that ends outside the input.
 
 Correctness notes
-- Daily reset is computed as the next 05:00 in the server’s local day using `zonedTimeToUtc` (roll forward one day if already past).
-- Weekly reset is computed as the next Tuesday 05:00 in the server’s local calendar; if it’s already past that instant, add 7 days.
-- All countdowns subtract `nowUtc` from the computed UTC instant — no mixing of wall time and UTC, so results are stable regardless of the user’s OS timezone.
+- Daily reset is computed as the next 05:00 in the server's local day using `zonedTimeToUtc` (roll forward one day if already past).
+- Weekly reset is computed as the next Tuesday 05:00 in the server's local calendar; if it's already past that instant, add 7 days.
+- All countdowns subtract `nowUtc` from the computed UTC instant — no mixing of wall time and UTC, so results are stable regardless of the user's OS timezone.
 
 Migration & compatibility
 - Keep the legacy name map for display/testing only. All countdown logic uses DB timezones.
@@ -857,17 +860,17 @@ Migration & compatibility
 
 Testing checklist
 - For a set of servers covering NA/EU/APAC with mixed DST status:
-  - Verify “server time” matches official local time for each server’s timezone.
+  - Verify "server time" matches official local time for each server's timezone.
   - On different local OS timezones, verify countdown numbers are identical (UTC subtraction only).
   - Around DST transitions, confirm daily and weekly next-reset UTC instants remain correct and advance monotonically.
   - On Thursday (local), validate weekly ≈ daily + 96h for most servers; differences allowed where server-local date differs.
-  - Verify Tasks completion periods (daily/weekly) align with countdown reset boundaries for each character’s `server_timezone`.
+  - Verify Tasks completion periods (daily/weekly) align with countdown reset boundaries for each character's `server_timezone`.
 
 ### 9.7 Event Templates/Presets — Plan
 
 Goals
 - Speed up creation of frequently used events by letting users save reusable templates/presets.
-- Replace “Quick War” with a general “New from Template” flow.
+- Replace "Quick War" with a general "New from Template" flow.
 - Keep templates independent of characters; server time resolution happens at event creation time from the chosen character.
 
 Scope and UX
@@ -914,7 +917,7 @@ Event Creation Flow with Templates
 - When a template is chosen in `EventModal`:
   - Set `formData` fields: `name`, `description`, `event_type`, `location`, `participation_status`, `notification_enabled`, `notification_minutes`.
   - Templates no longer set a preferred time mode.
-  - If `time_strategy` is present and the timezone source is resolvable (template server tz or selected character’s tz or local), compute `event_time` per strategy; otherwise leave empty and show helper.
+  - If `time_strategy` is present and the timezone source is resolvable (template server tz or selected character's tz or local), compute `event_time` per strategy; otherwise leave empty and show helper.
   - Strategies:
     - `relativeOffset`: now + `offsetMinutes` (timezone-independent instant)
     - `nextDayAtTime`: tomorrow at `timeOfDay` in tzSource → UTC
@@ -972,7 +975,7 @@ Integration with Events Page
 Error Handling & Messages
 - Name uniqueness: friendly error in `TemplateModal` if duplicate name.
 - Time compute: strategies compute local wall time; conversion to UTC on submit per EventModal mode.
-- Deletion guard: deleting a template doesn’t affect existing events.
+- Deletion guard: deleting a template doesn't affect existing events.
 
 Testing Additions (Section 10)
 - Templates Manager (new tests)
@@ -1006,11 +1009,11 @@ Testing Plan
 Recent fixes
 - Form initialization: add an open-cycle guard keyed by `editingEvent?.id` or `__create__` to prevent reactive re-inits while the modal is open. Guard is cleared on close, cancel, delete, and after successful submit.
 - Focus handling: focus the name field on open to guarantee keyboard navigation works on subsequent opens.
-- Validation: require presence of fields; allow editing past events (no “must be future” constraint) to avoid blocking edits.
-- Submission path: rely solely on the form’s `on:submit|preventDefault` handler; remove button click handler to prevent double submits. Add a `submitting` reentrancy flag and disable the button while submitting to avoid duplicates.
+- Validation: require presence of fields; allow editing past events (no "must be future" constraint) to avoid blocking edits.
+- Submission path: rely solely on the form's `on:submit|preventDefault` handler; remove button click handler to prevent double submits. Add a `submitting` reentrancy flag and disable the button while submitting to avoid duplicates.
 
 Implemented UX changes
-- Events list is now split into two sections: “Upcoming Events” and “Past Events”.
+- Events list is now split into two sections: "Upcoming Events" and "Past Events".
   - Classification is automatic based on `event_time` versus the current time; updates in-place every 30s so items naturally move between sections.
   - Past events render compact and slightly dimmed; retain Edit/Delete actions.
 - Event rows were compacted: smaller typography, tighter spacing, divider list, and condensed metadata row.
@@ -1021,6 +1024,30 @@ Testing checklist (Events)
 - Confirm no duplicate events are created on a single submit (button disabled while submitting, only one dispatch path).
 - Verify Upcoming/Past classification updates within ~30s without reload.
 - Confirm Past Events appear dimmed and use compact layout, with working Edit/Delete actions.
+
+War-specific Form Rules (NEW)
+- When `event_type = 'War'`:
+  - `war_type` is mandatory.
+  - Association is mandatory: user must choose either "By Character" or "By Server".
+    - If "By Character" is chosen, `character_id` is required and server fields are inferred from the character.
+    - If "By Server" is chosen, `server_name` is required (timezone resolves from servers list); `character_id` must be null.
+- `war_type` options presented to the user: `Attack`, `Defense`.
+  - `Unspecified` remains in storage for legacy events and edit-mode compatibility, but is NOT offered for new events.
+  - Editing a legacy war with `Unspecified`: display the value and show a subtle helper encouraging selection of Attack/Defense.
+- Segmented control (Local vs Server time):
+  - Server Time is enabled only when association is valid:
+    - By Character AND a `character_id` is selected; or
+    - By Server AND a `server_name` is selected.
+  - When association is `none`, force Local Time and disable the Server Time button with helper text.
+  - Helper text under the datetime input reflects the active mode and the resolved timezone (character server tz or selected server tz).
+
+Integration Points (UPDATED)
+- EventModal: native select for visual consistency with modal; opens with fresh `getEventById` snapshot.
+  - War form rules enforced (mandatory `war_type`, mandatory association and dependent field).
+  - `Unspecified` war type hidden for new events but displayed when present on legacy rows.
+  - Segmented control behavior: Server Time is disabled unless association is By Character with a selected `character_id` or By Server with a selected `server_name`; when association is None, Local Time is enforced and helper reflects that.
+- Events page & Dashboard: shared colored selector component for closed state (colored by status); dropdown list remains neutral; "Hide Absent" consults `is_absent`.
+- Calendar: reads status name for display; edits via EventModal.
 
 ### 9.9 Calendar — Filtering and layout polish
 
@@ -1043,10 +1070,10 @@ Testing checklist (Calendar)
 ### 9.10 Dashboard — Information density & layout
 
 Changes
-- Removed the non-functional “Active Characters” section.
-- Two-column layout: Left column stacks “Upcoming Events” above “Tasks”; right column shows “Reset Timers”.
+- Removed the non-functional "Active Characters" section.
+- Two-column layout: Left column stacks "Upcoming Events" above "Tasks"; right column shows "Reset Timers".
 - Tasks section:
-  - Added character selector to switch which character’s tasks are displayed.
+  - Added character selector to switch which character's tasks are displayed.
   - Shows all tasks (daily and weekly) for the selected character.
   - Completion toggles update only the selected character.
 - Reduced footprint across all cards: smaller headings, tighter spacing, smaller controls.
@@ -1141,7 +1168,7 @@ Testing Plan (Additions)
 - Migrations: tables and indexes created idempotently; existing characters unaffected.
 - CRUD:
   - Create/Edit/Delete accounts; duplicate label validation surfaced to user.
-  - Delete with reassignment; verify affected characters’ `steam_account_id` updated.
+  - Delete with reassignment; verify affected characters' `steam_account_id` updated.
   - Delete with Set to None; verify characters set to null.
 - Character modal:
   - Select existing account; save; reopen shows selection preserved.
@@ -1175,7 +1202,7 @@ Data Model (additive)
 
 Derived Windows
 - War window duration: 45 minutes total, covering 15 minutes of pre-pull plus 30 minutes of war time. Window = [event_time − 15 minutes, event_time + 30 minutes].
-- “Same war day” for caps: use server timezone if present via character or server; fallback to local timezone. Compute date token `YYYY-MM-DD` in that timezone.
+- "Same war day" for caps: use server timezone if present via character or server; fallback to local timezone. Compute date token `YYYY-MM-DD` in that timezone.
 
 Services & Logic (Main process)
 - warRulesService.ts (new):
@@ -1192,9 +1219,9 @@ Services & Logic (Main process)
 Renderer Integrations
 - EventModal.svelte
   - On change of `event_type`, `war_type`, `character_id`, or `event_time`, call `war:getConflictsForEvent` (debounced) and render inline warnings:
-    - Cap reached: “This character already has a {war_type} on this war day.”
-    - Steam duplicate: “Multiple characters on the same Steam account and server for {war_type}. Pre-slotting required.”
-    - Overlap: “This player has another war at this time.”
+    - Cap reached: "This character already has a {war_type} on this war day."
+    - Steam duplicate: "Multiple characters on the same Steam account and server for {war_type}. Pre-slotting required."
+    - Overlap: "This player has another war at this time."
   - CTA suggestions: change character; change war_type; adjust time; mark as Pre-slotted (phase 2 if we add `war_slot_status`).
 - Events.svelte / Dashboard.svelte
   - Row-level warning badges for War events with conflicts (computed via range API on load and after mutations).
@@ -1210,14 +1237,14 @@ Header Notifications
 
 UX Details
 - Warning badge styles: amber for caps/steam dupes; red for overlaps. Tooltips provide explanation.
-- Do not block submit in v1; show clear actionable text. Optionally add a “Prevent save with critical overlap” toggle in Settings (phase 2).
+- Do not block submit in v1; show clear actionable text. Optionally add a "Prevent save with critical overlap" toggle in Settings (phase 2).
 
 Severity Policy (App behavior)
 - Character cap violations (more than one of the same war type per war day for a character): HARD warning.
 - Time overlaps for the same player (same character or same steam account):
   - If exactly one event is Confirmed and the other(s) have any non-absent status → SOFT warning.
   - If two or more are Confirmed → HARD warning.
-  - Note: “non-absent” means status where `is_absent = 0`; absent includes statuses like “Absent” and “Cancelled”.
+  - Note: "non-absent" means status where `is_absent = 0`; absent includes statuses like "Absent" and "Cancelled".
 - Same-Steam + Same-Server + Same-War-Type (pre-slotting requirement): SOFT warning when two or more involved events have non-absent status.
 
 Performance
@@ -1390,14 +1417,14 @@ Scope & Follow-ups
 **Test 14: Multi-Character Task Testing**
 - [x] Verify only tasks assigned to each character appear where appropriate
 - [x] Complete the same task on two different characters
-- [x] Verify each character’s completion state is independent
+- [x] Verify each character's completion state is independent
 - [ ] Verify reset period differences across servers with different timezones
  - [x] Verify one-time task completion unassigns only for the character who completed it; other characters retain their assignment
 
 **Test 14.1: Assignment Management**
 - [x] Assign a task to a character via Tasks view assignment UI
 - [x] Verify it appears on Dashboard for that character
-- [x] Remove assignment; verify it disappears from that character’s list
+- [x] Remove assignment; verify it disappears from that character's list
 - - [x] Create a new task; confirm typing works in text inputs and textareas
 - - [x] Edit an existing task; confirm typing works in text inputs and textareas
 - - [x] Confirm Delete in library row removes the task and updates character cards
@@ -1554,7 +1581,7 @@ Scope & Follow-ups
 **Test 32: Modal Interaction Stability**
 - [x] Drag-select inside inputs; release outside: modal remains open (backdrop requires mousedown+click)
 - [x] ESC closes modal; backdrop click closes when intended
-- [x] In-app dialogs don’t steal focus
+- [x] In-app dialogs don't steal focus
 - [ ] Create multiple characters (10+)
 - [ ] Create multiple events (50+)
 - [ ] Test application responsiveness
