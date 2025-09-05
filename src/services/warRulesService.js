@@ -1,6 +1,6 @@
 import database from './database.js'
 import { subMinutes, addMinutes, isBefore, isAfter } from 'date-fns'
-import { utcToZonedTime, formatInTimeZone } from 'date-fns-tz'
+import { utcToZonedTime, formatInTimeZone, zonedTimeToUtc } from 'date-fns-tz'
 
 /**
  * War rules conflict detection service
@@ -89,8 +89,19 @@ class WarRulesService {
 
   warDayToken(isoDateTime, tz) {
     const zone = tz || 'UTC'
-    const token = formatInTimeZone(new Date(isoDateTime), zone, 'yyyy-MM-dd')
-    return token
+    return formatInTimeZone(new Date(isoDateTime), zone, 'yyyy-MM-dd')
+  }
+
+  getLocalDayBoundsUtc(isoDateTime, tz) {
+    const zone = tz || 'UTC'
+    const zoned = utcToZonedTime(new Date(isoDateTime), zone)
+    const startLocal = new Date(zoned)
+    startLocal.setHours(0, 0, 0, 0)
+    const endLocal = new Date(zoned)
+    endLocal.setHours(23, 59, 59, 999)
+    const startUtc = zonedTimeToUtc(startLocal, zone).toISOString()
+    const endUtc = zonedTimeToUtc(endLocal, zone).toISOString()
+    return { startUtc, endUtc }
   }
 
   summarizeSeverity(events, statusesCache) {
@@ -134,10 +145,16 @@ class WarRulesService {
     // Overlaps: same character OR same steam account
     const overlapping = nearby.filter(e => {
       const w = this.buildWarWindow(e.event_time)
-      return this.windowsOverlap(candidateWindow, w) && (
-        (candidate.character_id && e.character_id && e.character_id === candidate.character_id) ||
-        (e.steam_account_id && candidate.character_id && e.steam_account_id === this._getSteamForCharacter(candidate.character_id, nearby))
-      )
+      // If candidate has a character, compare by same character OR same steam
+      if (candidate.character_id) {
+        const candSteam = this._getSteamForCharacter(candidate.character_id, nearby)
+        return this.windowsOverlap(candidateWindow, w) && (
+          (e.character_id && e.character_id === candidate.character_id) ||
+          (candSteam && e.steam_account_id && e.steam_account_id === candSteam)
+        )
+      }
+      // If no character (server-only), overlaps cannot be attributed to a player; skip
+      return false
     })
 
     // Severity for overlaps considers both candidate and overlapping events
@@ -145,35 +162,33 @@ class WarRulesService {
 
     // Steam duplicates: same steam account + same server + same war_type
     let steamDupes = []
-    if (candidate.character_id) {
+    if (candidate.character_id && candidate.server_name && (candidate.war_type === 'Attack' || candidate.war_type === 'Defense')) {
       const candidateSteam = this._getSteamForCharacter(candidate.character_id, nearby)
       if (candidateSteam) {
         steamDupes = nearby.filter(e => {
+          const type = (e.war_type || e.war_role || 'Unspecified')
           if (!e.steam_account_id) return false
           if (!this.windowsOverlap(candidateWindow, this.buildWarWindow(e.event_time))) return false
           return (
             e.steam_account_id === candidateSteam &&
-            e.server_name && candidate.server_name && e.server_name === candidate.server_name &&
-            (e.war_type || e.war_role || 'Unspecified') === candidate.war_type
+            e.server_name && e.server_name === candidate.server_name &&
+            (type === candidate.war_type)
           )
         })
       }
     }
     const steamParticipants = [candidate, ...steamDupes]
     const steamNonAbsent = steamParticipants.filter(e => !this.isStatusAbsent(e.participation_status, statusesCache))
-    const steamSeverity = steamNonAbsent.length >= 2 ? 'soft' : 'none'
+    const steamSeverity = steamDupes.length > 0 && steamNonAbsent.length >= 2 ? 'soft' : 'none'
 
     // Caps: per character per war day per type
     let caps = []
     let capSeverity = 'none'
     if (candidate.character_id && (candidate.war_type === 'Attack' || candidate.war_type === 'Defense')) {
-      // Determine timezone to compute day token
       const tz = candidate.timezone || 'UTC'
       const dayToken = this.warDayToken(candidate.event_time, tz)
-      // Get events for the same character on the same local day (±24h window is sufficient)
-      const dayStart = formatInTimeZone(utcToZonedTime(new Date(candidate.event_time), tz), tz, 'yyyy-MM-ddT00:00:00XXX')
-      const dayEnd = formatInTimeZone(utcToZonedTime(new Date(candidate.event_time), tz), tz, 'yyyy-MM-ddT23:59:59XXX')
-      const sameChar = this.statements.getWarEventsForCharacterBetween.all(candidate.character_id, dayStart, dayEnd)
+      const { startUtc, endUtc } = this.getLocalDayBoundsUtc(candidate.event_time, tz)
+      const sameChar = this.statements.getWarEventsForCharacterBetween.all(candidate.character_id, startUtc, endUtc)
       const sameTypeSameDay = sameChar.filter(e => {
         const token = this.warDayToken(e.event_time, tz)
         const type = (e.war_type || e.war_role || 'Unspecified')

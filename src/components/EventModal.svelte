@@ -44,6 +44,7 @@
   // War rules conflicts
   let warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
   let checkingConflicts = false
+  let warningsOpen = false
   
   // Event types
   const eventTypes = [
@@ -634,27 +635,42 @@
         </div>
 
         {#if formData.event_type === 'War'}
-        <!-- War rules warnings -->
-        <div class="rounded-md border p-3 space-y-2"
-             class:border-amber-300={warConflicts.summaries.overlaps === 'soft' || warConflicts.summaries.steamDupes === 'soft' || warConflicts.summaries.caps === 'soft'}
-             class:border-red-300={warConflicts.summaries.overlaps === 'hard' || warConflicts.summaries.caps === 'hard'}
-        >
-          {#if association_mode === 'byServer' && !formData.character_id}
-            <div class="text-xs text-amber-700">Reminder: verify character war limits (1 Attack + 1 Defense per day) and pre-slots after choosing a character.</div>
-          {/if}
-          {#if (warConflicts.summaries.caps === 'hard')}
-            <div class="text-sm text-red-700">This character already has a {formData.war_role} on this war day.</div>
-          {/if}
-          {#if warConflicts.steamDupes.length > 0}
-            <div class="text-sm text-amber-700">Same-Steam + same server + same war type detected. Pre-slotting required.</div>
-          {/if}
-          {#if warConflicts.summaries.overlaps === 'soft'}
-            <div class="text-sm text-amber-700">Overlapping wars detected. One is Confirmed and others are non-absent.</div>
-          {:else if warConflicts.summaries.overlaps === 'hard'}
-            <div class="text-sm text-red-700">Overlapping wars detected with two or more Confirmed events.</div>
-          {/if}
-          {#if checkingConflicts}
-            <div class="text-xs text-gray-500">Checking war rules…</div>
+        <!-- War rules warnings popover -->
+        <div class="relative">
+          <button type="button" class="text-xs px-2 py-1 border rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+            on:click={() => warningsOpen = !warningsOpen}
+          >
+            {#if (warConflicts.summaries.overlaps === 'hard') || (warConflicts.summaries.caps === 'hard')}
+              ⚠ Critical war rules issues
+            {:else if (warConflicts.summaries.overlaps === 'soft') || (warConflicts.summaries.steamDupes === 'soft') || (association_mode === 'byServer' && !formData.character_id)}
+              ⚠ War rules warnings
+            {:else}
+              War rules (no issues)
+            {/if}
+          </button>
+          {#if warningsOpen}
+            <div class="absolute z-50 mt-2 w-80 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg p-3 space-y-2">
+              {#if checkingConflicts}
+                <div class="text-xs text-gray-500">Checking war rules…</div>
+              {/if}
+              {#if association_mode === 'byServer' && !formData.character_id}
+                <div class="text-xs text-amber-700">When you choose a character, verify daily limits (1 Attack + 1 Defense) and pre-slots if you use multiple characters on the same Steam account.</div>
+              {/if}
+              {#if (warConflicts.summaries.caps === 'hard')}
+                <div class="text-sm text-red-700">Daily cap reached: this character already has a {formData.war_role} on this war day.</div>
+              {/if}
+              {#if warConflicts.steamDupes.length > 0}
+                <div class="text-sm text-amber-700">Same Steam, same server, same war type detected across characters. Pre-slotting is required in-game.</div>
+              {/if}
+              {#if warConflicts.summaries.overlaps === 'soft'}
+                <div class="text-sm text-amber-700">Time overlap: one Confirmed war conflicts with another non-absent war.</div>
+              {:else if warConflicts.summaries.overlaps === 'hard'}
+                <div class="text-sm text-red-700">Time overlap: two or more Confirmed wars conflict in time.</div>
+              {/if}
+              {#if (warConflicts.summaries.caps !== 'hard') && warConflicts.steamDupes.length === 0 && warConflicts.summaries.overlaps === 'none' && !(association_mode === 'byServer' && !formData.character_id)}
+                <div class="text-xs text-gray-600 dark:text-gray-300">No issues detected.</div>
+              {/if}
+            </div>
           {/if}
         </div>
         {/if}
