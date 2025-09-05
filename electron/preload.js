@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         getStatistics: () => ipcRenderer.invoke('character:getStatistics'),
         getAllWithServerTime: () => ipcRenderer.invoke('character:getAllWithServerTime')
     },
+    // War rules conflicts
+    war: {
+        getConflictsForEvent: (dto) => ipcRenderer.invoke('war:getConflictsForEvent', dto),
+        getConflictsForRange: (startIso, endIso) => ipcRenderer.invoke('war:getConflictsForRange', startIso, endIso)
+    },
     
     // Server operations
     servers: {

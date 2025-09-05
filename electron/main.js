@@ -15,6 +15,7 @@ let serverService
 let eventTemplateService
 let participationStatusService
 let steamAccountService
+let warRulesService
 let resetSchedulerInterval = null
 
 // Import services
@@ -27,6 +28,7 @@ async function initializeServices() {
     const eventTemplateServiceModule = await import('../src/services/eventTemplateService.js')
     const participationStatusServiceModule = await import('../src/services/participationStatusService.js')
     const steamAccountServiceModule = await import('../src/services/steamAccountService.js')
+    const warRulesServiceModule = await import('../src/services/warRulesService.js')
     
     // Use the singleton instances
     database = databaseService.default
@@ -37,6 +39,7 @@ async function initializeServices() {
     eventTemplateService = eventTemplateServiceModule.default
     participationStatusService = participationStatusServiceModule.default
     steamAccountService = steamAccountServiceModule.default
+    warRulesService = warRulesServiceModule.default
     
     // Initialize the database
     await database.init(app.getPath('userData'))
@@ -60,6 +63,8 @@ async function initializeServices() {
     await eventTemplateService.ensureInitialized()
     await participationStatusService.ensureInitialized()
     await steamAccountService.ensureInitialized()
+    // war rules service relies on DB only
+    try { await warRulesService.ensureInitialized() } catch {}
 }
 
 // IPC Handlers
@@ -329,6 +334,14 @@ function setupIpcHandlers() {
     
     ipcMain.handle('event:createCompanyEvent', async (event, eventData) => {
         return await eventService.createCompanyEvent(eventData)
+    })
+
+    // War rules conflicts
+    ipcMain.handle('war:getConflictsForEvent', async (event, dto) => {
+        return await warRulesService.getWarConflictsForEvent(dto)
+    })
+    ipcMain.handle('war:getConflictsForRange', async (event, startIso, endIso) => {
+        return await warRulesService.getWarConflictsForRange(startIso, endIso)
     })
 
     // Event templates operations

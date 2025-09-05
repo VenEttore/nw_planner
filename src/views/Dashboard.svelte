@@ -10,6 +10,7 @@
   let characters = []
   let displayedTasks = []
   let upcomingEvents = []
+  let conflictSummaries = new Map()
   let statuses = []
   let showAbsent = true
   let resetTimers = {}
@@ -54,7 +55,7 @@
     loadPrefs()
     await loadData()
     if (selectedCharacterServers.length > 0) {
-      startResetTimers()
+    startResetTimers()
     }
     
     // Cleanup on unmount
@@ -118,6 +119,15 @@
           }),
           server: event.server_name || 'Unknown'
         }))
+        // Load conflict summaries for the same horizon
+        try {
+          const startIso = now.toISOString()
+          const rangeEnd = cutoff.toISOString()
+          const results = await api.getWarConflictsForRange(startIso, rangeEnd)
+          conflictSummaries = new Map(results.map(r => [r.event_id, { summaries: r.summaries, counts: r.counts }]))
+        } catch (e) {
+          conflictSummaries = new Map()
+        }
       } catch (error) {
         console.error('Error loading events:', error)
         upcomingEvents = []
@@ -219,6 +229,17 @@
       return 'War'
     }
     return t
+  }
+
+  function conflictBadgeFor(ev) {
+    if (ev.event_type !== 'War') return null
+    const sum = conflictSummaries.get(ev.id)
+    if (!sum) return null
+    const hard = sum.counts?.hard || 0
+    const soft = sum.counts?.soft || 0
+    if (hard > 0) return { kind: 'hard', text: `${hard} hard` }
+    if (soft > 0) return { kind: 'soft', text: `${soft} soft` }
+    return null
   }
 
   async function startResetTimers() {
@@ -392,6 +413,13 @@
                       <div class="flex items-center gap-2">
                         <span class="font-medium text-gray-900 dark:text-white text-sm">{event.name}</span>
                         <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{eventTypeWithWar(event)}</span>
+                        {#if conflictBadgeFor(event)}
+                          {#if conflictBadgeFor(event).kind === 'hard'}
+                            <span class="px-1.5 py-0.5 text-[9px] rounded bg-red-100 text-red-800 border border-red-200">{conflictBadgeFor(event).text}</span>
+                          {:else}
+                            <span class="px-1.5 py-0.5 text-[9px] rounded bg-amber-100 text-amber-800 border border-amber-200">{conflictBadgeFor(event).text}</span>
+                          {/if}
+                        {/if}
                       </div>
                       <div class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                         📅 {event.time} - {event.server}
@@ -422,9 +450,9 @@
           {/if}
         </div>
 
-        <div class="card">
+            <div class="card">
           <div class="mb-3">
-            <div class="flex items-center justify-between">
+              <div class="flex items-center justify-between">
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Tasks</h2>
             </div>
 
@@ -493,7 +521,7 @@
                   </div>
                 {/if}
                 {#if dailyTasks.length > 0}
-                  <div>
+                <div>
                     <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Daily</div>
                     <div class="space-y-2">
                       <div class="divide-y divide-gray-200 dark:divide-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
@@ -508,11 +536,11 @@
                               />
                               <span class="text-sm text-gray-900 dark:text-white {task.completed ? 'line-through opacity-50' : ''}">{task.name}</span>
                               <span class={`text-[10px] ml-2 ${getPriorityClass(task.priority)}`}>{task.priority}</span>
-                            </div>
-                          </div>
-                        {/each}
-                      </div>
-                    </div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </div>
                   </div>
                 {/if}
 
@@ -536,10 +564,10 @@
                           </div>
                         {/each}
                       </div>
-                    </div>
-                  </div>
-                {/if}
-
+        </div>
+      </div>
+    {/if}
+    
                 {#if oneTimeTasks.length > 0}
                   <div>
                     <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">One-time</div>
@@ -548,18 +576,18 @@
                         {#each oneTimeTasks as task (task.id)}
                           <div class="flex items-center justify-between px-2 py-1.5">
                             <div class="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                checked={task.completed}
-                                on:change={() => toggleTaskCompletion(task)}
+                  <input 
+                    type="checkbox" 
+                    checked={task.completed}
+                    on:change={() => toggleTaskCompletion(task)}
                                 class="w-4 h-4 text-nw-blue border-gray-300 rounded focus:ring-nw-blue dark:focus:ring-nw-blue dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                              />
+                  />
                               <span class="text-sm text-gray-900 dark:text-white {task.completed ? 'line-through opacity-50' : ''}">{task.name}</span>
                               <span class={`text-[10px] ml-2 ${getPriorityClass(task.priority)}`}>{task.priority}</span>
-                            </div>
-                          </div>
-                        {/each}
-                      </div>
+                </div>
+              </div>
+            {/each}
+          </div>
                     </div>
                   </div>
                 {/if}

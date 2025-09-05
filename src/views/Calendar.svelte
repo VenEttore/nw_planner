@@ -15,6 +15,7 @@
   let events = []
   let characters = []
   let statuses = []
+  let conflictSummaries = new Map()
   let selectedCharacterIds = []
   let characterSearch = ''
   let showAll = true
@@ -130,6 +131,14 @@
       const allowed = new Set(selectedCharacterIds)
       const filteredEvents = calendarEvents.filter(event => allowed.has(event.character_id))
       
+      // Load conflict summaries for the current range (for war events)
+      try {
+        const results = await api.getWarConflictsForRange(start.toISOString(), end.toISOString())
+        conflictSummaries = new Map(results.map(r => [r.event_id, { summaries: r.summaries, counts: r.counts }]))
+      } catch (e) {
+        conflictSummaries = new Map()
+      }
+
       // Format events for FullCalendar
       const formattedEvents = filteredEvents.map(event => ({
         id: event.id,
@@ -147,7 +156,7 @@
           originalEvent: event
         },
         backgroundColor: getEventColor(event.event_type, event.participation_status),
-        borderColor: getEventBorderColor(event.event_type),
+        borderColor: decorateBorder(event),
         textColor: getEventTextColor(event.event_type, event.participation_status),
         className: getEventClassName(event.event_type, event.participation_status)
       }))
@@ -247,6 +256,16 @@
     
     return colors[eventType] || colors['Custom']
   }
+
+  function decorateBorder(event) {
+    const base = getEventBorderColor(event.event_type)
+    if (event.event_type !== 'War') return base
+    const sum = conflictSummaries.get(event.id)
+    if (!sum) return base
+    if ((sum.counts?.hard || 0) > 0) return '#991b1b' // red-800
+    if ((sum.counts?.soft || 0) > 0) return '#b45309' // amber-700
+    return base
+  }
   
   function getEventTextColor(eventType, status) {
     return '#ffffff'
@@ -266,7 +285,7 @@
       const fresh = await api.getEventById(event.id)
       editingEvent = fresh || event.extendedProps.originalEvent
     } catch {
-      editingEvent = event.extendedProps.originalEvent
+    editingEvent = event.extendedProps.originalEvent
     }
     isCreating = false
     showEventModal = true
@@ -331,7 +350,14 @@
     const event = info.event
     
     // Add tooltips for events
-    const title = `${event.title}\n${event.extendedProps.description || ''}\nServer: ${event.extendedProps.server || 'Unknown'}\nStatus: ${event.extendedProps.status || 'Unknown'}`
+    let extra = ''
+    const sum = conflictSummaries.get(event.id)
+    if (sum) {
+      const hard = sum.counts?.hard || 0
+      const soft = sum.counts?.soft || 0
+      if (hard > 0 || soft > 0) extra = `\nConflicts: ${hard > 0 ? hard + ' hard' : ''}${hard>0 && soft>0 ? ', ' : ''}${soft > 0 ? soft + ' soft' : ''}`
+    }
+    const title = `${event.title}\n${event.extendedProps.description || ''}\nServer: ${event.extendedProps.server || 'Unknown'}\nStatus: ${event.extendedProps.status || 'Unknown'}${extra}`
     info.el.setAttribute('title', title)
   }
   
@@ -346,9 +372,9 @@
       await refreshCalendarEvents()
       // Reset modal state after a tick so the modal can close cleanly and not reuse old form state
       queueMicrotask(() => {
-        showEventModal = false
-        editingEvent = null
-        isCreating = false
+      showEventModal = false
+      editingEvent = null
+      isCreating = false
       })
     } catch (error) {
       console.error('Error saving event:', error)
@@ -358,9 +384,9 @@
   function handleEventCancel() {
     // Defer clearing to avoid immediate reactivity clashes with the modal internals
     queueMicrotask(() => {
-      showEventModal = false
-      editingEvent = null
-      isCreating = false
+    showEventModal = false
+    editingEvent = null
+    isCreating = false
     })
   }
   
@@ -369,9 +395,9 @@
       await api.deleteEvent(eventId)
       await refreshCalendarEvents()
       queueMicrotask(() => {
-        showEventModal = false
-        editingEvent = null
-        isCreating = false
+      showEventModal = false
+      editingEvent = null
+      isCreating = false
       })
     } catch (error) {
       console.error('Error deleting event:', error)
@@ -449,12 +475,12 @@
                   <span class="truncate">{character.name}</span>
                 </span>
               </span>
-            {/each}
-          </div>
+          {/each}
         </div>
       </div>
     </div>
-    
+      </div>
+      
     
   </div>
   
@@ -632,4 +658,4 @@
     background: rgba(59, 130, 246, 0.2) !important;
   }
   .chip { cursor: pointer; }
-</style>
+</style> 

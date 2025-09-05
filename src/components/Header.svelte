@@ -8,6 +8,8 @@
   let statuses = []
   let upcomingEvents = []
   let refreshIntervalId = null
+  let warnings = []
+  let showWarningsPanel = false
   
   onMount(async () => {
     await loadUpcomingEvents()
@@ -56,9 +58,19 @@
         })
         .sort((a, b) => new Date(a.event_time) - new Date(b.event_time))
         .slice(0, 3)
+      // Load warnings for the next 48 hours
+      try {
+        const warnStart = now.toISOString()
+        const warnEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString()
+        const results = await api.getWarConflictsForRange(warnStart, warnEnd)
+        warnings = results.filter(r => (r.counts?.hard || 0) > 0 || (r.counts?.soft || 0) > 0)
+      } catch (e) {
+        warnings = []
+      }
     } catch (error) {
       console.error('Error loading upcoming events:', error)
       upcomingEvents = []
+      warnings = []
     } finally {
       eventsLoading = false
     }
@@ -106,8 +118,52 @@
       </div>
     </div>
     
-    <!-- Right - Settings and Dark Mode -->
+    <!-- Right - Notifications, Settings and Dark Mode -->
     <div class="flex items-center space-x-4">
+      <!-- Notification bell -->
+      <div class="relative">
+        <button
+          class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors relative"
+          on:click={() => showWarningsPanel = !showWarningsPanel}
+          title="War warnings"
+        >
+          <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          {#if warnings.length > 0}
+            <span class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{warnings.length}</span>
+          {/if}
+        </button>
+        {#if showWarningsPanel}
+          <div class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+            <div class="p-2 border-b border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">War Warnings</div>
+            {#if warnings.length === 0}
+              <div class="p-3 text-xs text-gray-600 dark:text-gray-400">No warnings in the next 48 hours.</div>
+            {:else}
+              <div class="max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
+                {#each warnings as w}
+                  <div class="p-2 text-xs text-gray-700 dark:text-gray-300">
+                    <div class="flex items-center justify-between">
+                      <div class="font-medium">Event #{w.event_id}</div>
+                      {#if (w.counts?.hard || 0) > 0}
+                        <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">{w.counts.hard} hard</span>
+                      {:else if (w.counts?.soft || 0) > 0}
+                        <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">{w.counts.soft} soft</span>
+                      {/if}
+                    </div>
+                    <div class="mt-1 text-[11px] text-gray-600 dark:text-gray-400">
+                      {#if w.summaries.caps === 'hard'}Cap limit reached on day. {/if}
+                      {#if w.summaries.overlaps === 'hard'}Overlap with ≥2 Confirmed. {/if}
+                      {#if w.summaries.overlaps === 'soft'}Overlap with 1 Confirmed + others non-absent. {/if}
+                      {#if w.summaries.steamDupes === 'soft'}Same-Steam + same server + same type; pre-slot needed. {/if}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
       <button
         class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
         on:click={toggleDarkMode}

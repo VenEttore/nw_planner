@@ -367,7 +367,7 @@
               {:else}
                 Retrieve Server List
               {/if}
-            </button>
+          </button>
             <button on:click={clearUnusedServers} class="px-3 py-2 bg-red-50 text-red-700 dark:bg-red-900 dark:text-red-200 rounded-md hover:bg-red-100 dark:hover:bg-red-800 transition-colors">Clear Unused</button>
           </div>
         </div>
@@ -479,7 +479,7 @@
       </div>
       
       
-
+      
       <!-- About -->
       <div class="card">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">About</h2>

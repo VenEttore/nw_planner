@@ -41,6 +41,9 @@
   let servers = []
   let association_mode = 'byCharacter' // 'byCharacter' | 'byServer' | 'none'
   $: canUseServerTime = (association_mode === 'byCharacter' && !!formData.character_id) || (association_mode === 'byServer' && !!formData.server_name)
+  // War rules conflicts
+  let warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
+  let checkingConflicts = false
   
   // Event types
   const eventTypes = [
@@ -64,7 +67,7 @@
     const key = editingEvent?.id ?? '__create__'
     if (initializedForKey !== key) {
       if (editingEvent) {
-        populateForm()
+    populateForm()
       } else {
         resetForm()
       }
@@ -140,6 +143,51 @@
     try { servers = await api.getActiveServers() } catch (_) { servers = [] }
   }
   $: if (show) { (async ()=>{ await loadServers() })() }
+
+  // Debounced conflict check
+  let conflictTimer
+  function scheduleConflictCheck() {
+    if (!show) return
+    if (conflictTimer) clearTimeout(conflictTimer)
+    conflictTimer = setTimeout(runConflictCheck, 200)
+  }
+  async function runConflictCheck() {
+    if (!show) return
+    if (formData.event_type !== 'War') { warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }; return }
+    if (!formData.event_time) { warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }; return }
+    checkingConflicts = true
+    try {
+      // Determine effective timezone like submit does
+      let effectiveTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      if (timeMode === 'server') {
+        if (association_mode === 'byCharacter') {
+          const character = characters.find(c => c.id === parseInt(formData.character_id))
+          effectiveTimezone = character?.server_timezone || formData.timezone || effectiveTimezone
+        } else if (association_mode === 'byServer') {
+          const server = servers.find(s => s.name === formData.server_name)
+          effectiveTimezone = server?.timezone || formData.timezone || effectiveTimezone
+        }
+      } else {
+        effectiveTimezone = formData.timezone || effectiveTimezone
+      }
+      const dto = {
+        id: editingEvent?.id,
+        event_type: 'War',
+        war_type: formData.war_role,
+        character_id: association_mode === 'byCharacter' ? (formData.character_id ? parseInt(formData.character_id) : null) : null,
+        server_name: association_mode === 'byServer' ? (formData.server_name || '') : (characters.find(c => c.id === parseInt(formData.character_id))?.server_name || formData.server_name || ''),
+        event_time: timeMode === 'server' ? new Date(zonedTimeToUtc(formData.event_time, effectiveTimezone)).toISOString() : new Date(formData.event_time).toISOString(),
+        timezone: effectiveTimezone,
+        participation_status: formData.participation_status
+      }
+      warConflicts = await api.getWarConflictsForEvent(dto)
+    } catch (e) {
+      console.error('War conflict check failed:', e)
+      warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
+    } finally {
+      checkingConflicts = false
+    }
+  }
 
   // Auto-apply initial template if provided on first show
   let appliedInitial = false
@@ -268,9 +316,9 @@
     }
     
     if (association_mode === 'byCharacter') {
-      if (!formData.character_id) {
-        errors.character_id = 'Character selection is required'
-      }
+    if (!formData.character_id) {
+      errors.character_id = 'Character selection is required'
+    }
     } else if (association_mode === 'byServer') {
       if (!formData.server_name) {
         errors.server_name = 'Server selection is required'
@@ -327,7 +375,7 @@
       formData.character_id = null
       formData.server_name = ''
     }
-
+    
     // Format event data for submission
     const eventData = {
       ...formData,
@@ -374,9 +422,9 @@
   function syncServerFromCharacter() {
     if (association_mode !== 'byCharacter') return
     if (!formData?.character_id) return
-    const character = characters.find(c => c.id === parseInt(formData.character_id))
-    if (character) {
-      formData.server_name = character.server_name
+      const character = characters.find(c => c.id === parseInt(formData.character_id))
+      if (character) {
+        formData.server_name = character.server_name
       formData.timezone = character.server_timezone || formData.timezone
     }
   }
@@ -384,6 +432,7 @@
   // Auto-populate server name when character changes
   function handleCharacterChange() {
     syncServerFromCharacter()
+    scheduleConflictCheck()
   }
 
   function handleServerChange(e) {
@@ -393,6 +442,7 @@
       formData.server_name = server.name
       formData.timezone = server.timezone || formData.timezone
     }
+    scheduleConflictCheck()
   }
   
   // Get event type specific defaults
@@ -428,6 +478,13 @@
       }
       formData.notification_minutes = defaults.notification_minutes
     }
+  }
+
+  // Watch inputs to re-check conflicts
+  $: if (show) {
+    // key fields that impact conflicts
+    const keyTuple = [formData.event_type, formData.war_role, formData.character_id, formData.server_name, formData.event_time, timeMode, association_mode, formData.participation_status]
+    keyTuple, scheduleConflictCheck()
   }
 </script>
 
@@ -489,23 +546,23 @@
             {/if}
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+        <div>
               <label for="event_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Event Type *</label>
-              <select
-                id="event_type"
-                bind:value={formData.event_type}
-                on:change={handleEventTypeChange}
-                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
-                class:border-red-500={errors.event_type}
-                required
-              >
-                {#each eventTypes as eventType}
-                  <option value={eventType}>{eventType}</option>
-                {/each}
-              </select>
-              {#if errors.event_type}
-                <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.event_type}</p>
-              {/if}
+          <select
+            id="event_type"
+            bind:value={formData.event_type}
+            on:change={handleEventTypeChange}
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-nw-blue focus:border-transparent dark:bg-gray-700 dark:text-white"
+            class:border-red-500={errors.event_type}
+            required
+          >
+            {#each eventTypes as eventType}
+              <option value={eventType}>{eventType}</option>
+            {/each}
+          </select>
+          {#if errors.event_type}
+            <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.event_type}</p>
+          {/if}
             </div>
             {#if formData.event_type === 'War'}
             <div>
@@ -526,7 +583,7 @@
         
         <!-- Association + Character/Server selection -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
+        <div>
             <label for="assoc_mode" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Association</label>
             <select
               id="assoc_mode"
@@ -558,7 +615,33 @@
             {#if errors.character_id}
               <p class="mt-1 text-sm text-red-600 dark:text-red-400">{errors.character_id}</p>
             {/if}
-          </div>
+        </div>
+
+        {#if formData.event_type === 'War'}
+        <!-- War rules warnings -->
+        <div class="rounded-md border p-3 space-y-2"
+             class:border-amber-300={warConflicts.summaries.overlaps === 'soft' || warConflicts.summaries.steamDupes === 'soft' || warConflicts.summaries.caps === 'soft'}
+             class:border-red-300={warConflicts.summaries.overlaps === 'hard' || warConflicts.summaries.caps === 'hard'}
+        >
+          {#if association_mode === 'byServer' && !formData.character_id}
+            <div class="text-xs text-amber-700">Reminder: verify character war limits (1 Attack + 1 Defense per day) and pre-slots after choosing a character.</div>
+          {/if}
+          {#if (warConflicts.summaries.caps === 'hard')}
+            <div class="text-sm text-red-700">This character already has a {formData.war_role} on this war day.</div>
+          {/if}
+          {#if warConflicts.steamDupes.length > 0}
+            <div class="text-sm text-amber-700">Same-Steam + same server + same war type detected. Pre-slotting required.</div>
+          {/if}
+          {#if warConflicts.summaries.overlaps === 'soft'}
+            <div class="text-sm text-amber-700">Overlapping wars detected. One is Confirmed and others are non-absent.</div>
+          {:else if warConflicts.summaries.overlaps === 'hard'}
+            <div class="text-sm text-red-700">Overlapping wars detected with two or more Confirmed events.</div>
+          {/if}
+          {#if checkingConflicts}
+            <div class="text-xs text-gray-500">Checking war rules…</div>
+          {/if}
+        </div>
+        {/if}
           {:else if association_mode === 'byServer'}
           <div class="md:col-span-2">
             <label for="server_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Server *</label>
@@ -589,8 +672,8 @@
           <div>
             <div class="flex items-center justify-between mb-2">
               <label for="event_time" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Event Time *
-              </label>
+              Event Time *
+            </label>
               <div class="inline-flex rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
                 <button type="button" class={`px-3 py-1 text-xs ${timeMode === 'local' ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`} on:click={() => timeMode = 'local'} aria-pressed={timeMode === 'local'}>
                   Local Time

@@ -895,6 +895,24 @@ class ApiService {
         return existing.find(e => e.id === id) || null
     }
 
+    // War rules conflicts
+    async getWarConflictsForEvent(dto) {
+        await this.init()
+        if (this.isElectron && this.electronAPI.war) {
+            return await this.electronAPI.war.getConflictsForEvent(dto)
+        }
+        // Web fallback: no conflicts
+        return { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
+    }
+
+    async getWarConflictsForRange(startIso, endIso) {
+        await this.init()
+        if (this.isElectron && this.electronAPI.war) {
+            return await this.electronAPI.war.getConflictsForRange(startIso, endIso)
+        }
+        return []
+    }
+
     // Participation statuses API
     async getParticipationStatuses() {
         await this.init()

@@ -47,13 +47,14 @@
       characters = charactersData
       statuses = Array.isArray(statusData) ? statusData : []
       templates = templatesData
+      await refreshWarConflictsRange()
     } catch (error) {
       console.error('Error loading events data:', error)
     } finally {
       loading = false
     }
   }
-
+  
   // Just-in-time refresh for template list used by the action bar selector
   async function reloadTemplatesList() {
     try { templates = await api.getEventTemplates() } catch { /* noop */ }
@@ -79,12 +80,12 @@
     const { showConfirm } = await import('../stores/dialog.js')
     const ok = await showConfirm('Are you sure you want to delete this event?', 'Delete Event', 'Delete', 'Cancel')
     if (!ok) return
-    try {
-      await api.deleteEvent(eventId)
+      try {
+        await api.deleteEvent(eventId)
       // Remove locally without reloading everything
       events = (events || []).filter(e => e.id !== eventId)
-    } catch (error) {
-      console.error('Error deleting event:', error)
+      } catch (error) {
+        console.error('Error deleting event:', error)
     }
   }
 
@@ -167,6 +168,31 @@
     }
     return t
   }
+
+  // War conflict badges support
+  let conflictSummaries = new Map()
+  async function refreshWarConflictsRange() {
+    try {
+      const startIso = new Date(Date.now() - 24*60*60*1000).toISOString()
+      const endIso = new Date(Date.now() + 7*24*60*60*1000).toISOString()
+      const results = await api.getWarConflictsForRange(startIso, endIso)
+      conflictSummaries = new Map(results.map(r => [r.event_id, { summaries: r.summaries, counts: r.counts }]))
+    } catch (e) {
+      console.warn('Failed to load war conflict summaries:', e)
+      conflictSummaries = new Map()
+    }
+  }
+
+  function conflictBadgeFor(ev) {
+    if (ev.event_type !== 'War') return null
+    const sum = conflictSummaries.get(ev.id)
+    if (!sum) return null
+    const hard = sum.counts?.hard || 0
+    const soft = sum.counts?.soft || 0
+    if (hard > 0) return { kind: 'hard', text: `${hard} hard` }
+    if (soft > 0) return { kind: 'soft', text: `${soft} soft` }
+    return null
+  }
 </script>
 
 <div class="max-w-7xl mx-auto">
@@ -234,6 +260,13 @@
                   <span class="text-xs px-2 py-1 rounded-full {getEventTypeColor(event.event_type)}">
                     {eventTypeWithWar(event)}
                   </span>
+                  {#if conflictBadgeFor(event)}
+                    {#if conflictBadgeFor(event).kind === 'hard'}
+                      <span class="px-2 py-0.5 text-[10px] rounded bg-red-100 text-red-800 border border-red-200">{conflictBadgeFor(event).text}</span>
+                    {:else}
+                      <span class="px-2 py-0.5 text-[10px] rounded bg-amber-100 text-amber-800 border border-amber-200">{conflictBadgeFor(event).text}</span>
+                    {/if}
+                  {/if}
                 </div>
                 
                 <!-- Event Details -->
@@ -269,7 +302,7 @@
                 <!-- Action Buttons -->
                 <div class="flex gap-1">
                   <button class="btn-secondary text-xs px-2 py-1" on:click={() => openEdit(event)}>Edit</button>
-                  <button
+                  <button 
                     class="btn-danger text-xs px-2 py-1"
                     on:click={() => deleteEvent(event.id)}
                   >
@@ -280,8 +313,8 @@
             </div>
           </div>
         {/each}
-        </div>
-      {:else}
+      </div>
+    {:else}
         <div class="text-sm text-gray-600 dark:text-gray-400">No upcoming events match your filters.</div>
       {/if}
     </div>
@@ -330,8 +363,8 @@
       {:else}
         <div class="text-sm text-gray-600 dark:text-gray-400">No past events.</div>
       {/if}
-    </div>
-  {/if}
+      </div>
+    {/if}
   <EventModal show={showModal} editingEvent={editingEvent} characters={characters} statuses={statuses} isCreating={!editingEvent} initialTemplateId={pendingTemplateId} on:save={handleSave} on:cancel={() => { showModal = false; editingEvent = null; pendingTemplateId = null }} on:delete={async (e) => { try { await api.deleteEvent(e.detail); showModal = false; editingEvent = null; pendingTemplateId = null; await loadData() } catch (err) { console.error('Delete failed', err) } }} />
   <TemplateManager
     isOpen={showTemplateManager}
