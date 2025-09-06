@@ -138,7 +138,10 @@
         </button>
         {#if showWarningsPanel}
           <div class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
-            <div class="p-2 border-b border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">War Warnings</div>
+            <div class="p-2 border-b border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center justify-between">
+              <span>War Warnings</span>
+              <button class="text-xs text-gray-600 dark:text-gray-300 hover:underline" on:click={() => { readWarningIds = new Set(); localStorage.removeItem('nw_warning_read_ids'); showWarningsPanel = false; setTimeout(()=> showWarningsPanel = true, 0) }}>Show all</button>
+            </div>
             {#if warnings.length === 0}
               <div class="p-3 text-xs text-gray-600 dark:text-gray-400">No warnings in the next 48 hours.</div>
             {:else}
@@ -160,11 +163,9 @@
                       {#if w.summaries.steamDupes === 'soft'}Same-Steam + same server + same type; pre-slot needed. {/if}
                     </div>
                     <div class="mt-2 flex justify-end gap-2">
-                      {#if !readWarningIds.has(w.event_id)}
-                        <button class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600" on:click={() => { readWarningIds.add(w.event_id); localStorage.setItem('nw_warning_read_ids', JSON.stringify(Array.from(readWarningIds))); }}>
-                          Mark as read
-                        </button>
-                      {/if}
+                      <button class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600" on:click={() => { if (readWarningIds.has(w.event_id)) { readWarningIds.delete(w.event_id) } else { readWarningIds.add(w.event_id) } localStorage.setItem('nw_warning_read_ids', JSON.stringify(Array.from(readWarningIds))); }}>
+                        {readWarningIds.has(w.event_id) ? 'Mark unread' : 'Mark as read'}
+                      </button>
                     </div>
                   </div>
                 {/each}

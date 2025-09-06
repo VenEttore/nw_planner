@@ -261,11 +261,9 @@
                     {eventTypeWithWar(event)}
                   </span>
                   {#if conflictBadgeFor(event)}
-                    {#if conflictBadgeFor(event).kind === 'hard'}
-                      <span class="px-2 py-0.5 text-[10px] rounded bg-red-100 text-red-800 border border-red-200">{conflictBadgeFor(event).text}</span>
-                    {:else}
-                      <span class="px-2 py-0.5 text-[10px] rounded bg-amber-100 text-amber-800 border border-amber-200">{conflictBadgeFor(event).text}</span>
-                    {/if}
+                    <button class="sr-only focus:not-sr-only focus:outline-none text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200" on:click={() => openEdit(event)} title="View war conflicts">
+                      {conflictBadgeFor(event).text}
+                    </button>
                   {/if}
                 </div>
                 

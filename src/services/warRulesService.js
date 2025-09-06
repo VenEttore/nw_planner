@@ -23,7 +23,7 @@ class WarRulesService {
     this.statements = {
       // Fetch all war events within a broad time window
       getWarEventsBetween: await this.db.prepare(`
-        SELECT e.*, c.steam_account_id, c.server_timezone
+        SELECT e.*, c.steam_account_id, c.server_timezone, c.server_name AS character_server_name
         FROM events e
         LEFT JOIN characters c ON c.id = e.character_id
         WHERE e.event_type = 'War'
@@ -33,7 +33,7 @@ class WarRulesService {
       `),
       // Fetch war events for a specific character (for caps check)
       getWarEventsForCharacterBetween: await this.db.prepare(`
-        SELECT e.*, c.steam_account_id, c.server_timezone
+        SELECT e.*, c.steam_account_id, c.server_timezone, c.server_name AS character_server_name
         FROM events e
         LEFT JOIN characters c ON c.id = e.character_id
         WHERE e.event_type = 'War' AND e.character_id = ?
@@ -64,6 +64,18 @@ class WarRulesService {
     this.cachedStatuses = { absentNames: absent }
     return this.cachedStatuses
   }
+
+  _getServerForCharacter(characterId, nearbyEvents) {
+    if (!characterId) return null
+    const found = nearbyEvents.find(e => e.character_id === characterId && (e.server_name || e.character_server_name))
+    if (found) return found.server_name || found.character_server_name
+    try {
+      const row = this.db.db.prepare('SELECT server_name FROM characters WHERE id = ?').get(characterId)
+      return row?.server_name || null
+    } catch (_) { return null }
+  }
+
+  _eventServerName(e) { return e?.server_name || e?.character_server_name || null }
 
   isStatusAbsent(statusName, statusesCache) {
     if (!statusName) return false
@@ -134,6 +146,11 @@ class WarRulesService {
       participation_status: dto?.participation_status || 'Signed Up'
     }
 
+    // Fill missing server_name from character when possible
+    if (!candidate.server_name && candidate.character_id) {
+      candidate.server_name = this._getServerForCharacter(candidate.character_id, nearby)
+    }
+
     const candidateWindow = this.buildWarWindow(candidate.event_time)
 
     // Load a 4-hour window around the candidate time to filter for overlaps
@@ -150,7 +167,7 @@ class WarRulesService {
         const candSteam = this._getSteamForCharacter(candidate.character_id, nearby)
         return this.windowsOverlap(candidateWindow, w) && (
           (e.character_id && e.character_id === candidate.character_id) ||
-          (candSteam && e.steam_account_id && e.steam_account_id === candSteam)
+          (candSteam && (e.steam_account_id || this._getSteamForCharacter(e.character_id, nearby)) === candSteam)
         )
       }
       // If no character (server-only), overlaps cannot be attributed to a player; skip
@@ -167,13 +184,11 @@ class WarRulesService {
       if (candidateSteam) {
         steamDupes = nearby.filter(e => {
           const type = (e.war_type || e.war_role || 'Unspecified')
-          if (!e.steam_account_id) return false
+          const eSteam = e.steam_account_id || this._getSteamForCharacter(e.character_id, nearby)
+          if (!eSteam) return false
           if (!this.windowsOverlap(candidateWindow, this.buildWarWindow(e.event_time))) return false
-          return (
-            e.steam_account_id === candidateSteam &&
-            e.server_name && e.server_name === candidate.server_name &&
-            (type === candidate.war_type)
-          )
+          const eServer = this._eventServerName(e)
+          return (eSteam === candidateSteam && eServer && eServer === candidate.server_name && type === candidate.war_type)
         })
       }
     }
