@@ -237,8 +237,8 @@
     if (!sum) return null
     const hard = sum.counts?.hard || 0
     const soft = sum.counts?.soft || 0
-    if (hard > 0) return { kind: 'hard', text: `${hard} hard` }
-    if (soft > 0) return { kind: 'soft', text: `${soft} soft` }
+    if (hard > 0) return { kind: 'hard', text: `War Conflicts` }
+    if (soft > 0) return { kind: 'soft', text: `War Conflicts` }
     return null
   }
 

@@ -9,6 +9,7 @@
   let upcomingEvents = []
   let refreshIntervalId = null
   let warnings = []
+  let readWarningIds = new Set(JSON.parse(localStorage.getItem('nw_warning_read_ids') || '[]'))
   let showWarningsPanel = false
   
   onMount(async () => {
@@ -63,7 +64,8 @@
         const warnStart = now.toISOString()
         const warnEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString()
         const results = await api.getWarConflictsForRange(warnStart, warnEnd)
-        warnings = results.filter(r => (r.counts?.hard || 0) > 0 || (r.counts?.soft || 0) > 0)
+        const all = results.filter(r => (r.counts?.hard || 0) > 0 || (r.counts?.soft || 0) > 0)
+        warnings = all
       } catch (e) {
         warnings = []
       }
@@ -131,7 +133,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
           {#if warnings.length > 0}
-            <span class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{warnings.length}</span>
+            <span class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{warnings.filter(w => !readWarningIds.has(w.event_id)).length}</span>
           {/if}
         </button>
         {#if showWarningsPanel}
@@ -157,8 +159,20 @@
                       {#if w.summaries.overlaps === 'soft'}Overlap with 1 Confirmed + others non-absent. {/if}
                       {#if w.summaries.steamDupes === 'soft'}Same-Steam + same server + same type; pre-slot needed. {/if}
                     </div>
+                    <div class="mt-2 flex justify-end gap-2">
+                      {#if !readWarningIds.has(w.event_id)}
+                        <button class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600" on:click={() => { readWarningIds.add(w.event_id); localStorage.setItem('nw_warning_read_ids', JSON.stringify(Array.from(readWarningIds))); }}>
+                          Mark as read
+                        </button>
+                      {/if}
+                    </div>
                   </div>
                 {/each}
+              </div>
+              <div class="p-2 border-t border-gray-200 dark:border-gray-700 text-right">
+                <button class="text-xs text-gray-600 dark:text-gray-300 hover:underline" on:click={() => { readWarningIds = new Set(); localStorage.removeItem('nw_warning_read_ids'); }}>
+                  Mark all unread
+                </button>
               </div>
             {/if}
           </div>
