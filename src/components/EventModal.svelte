@@ -45,6 +45,9 @@
   let warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
   let checkingConflicts = false
   let warningsOpen = false
+  let warnBtnEl
+  let popoverPos = { top: 0, left: 0 }
+  const POPOVER_WIDTH_PX = 320 // matches w-80 (20rem)
   
   // Event types
   const eventTypes = [
@@ -636,20 +639,22 @@
 
         {#if formData.event_type === 'War'}
         <!-- War rules warnings popover -->
-        <div class="relative">
-          <button type="button" class="text-xs px-2 py-1 border rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-            on:click={() => warningsOpen = !warningsOpen}
+        <div class="relative z-[1100]">
+          <button bind:this={warnBtnEl} type="button" class="text-xs px-2 py-1 border rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+            on:click={() => {
+              warningsOpen = !warningsOpen
+              if (warningsOpen && warnBtnEl) {
+                const rect = warnBtnEl.getBoundingClientRect()
+                let left = Math.min(Math.max(8, rect.left), (window.innerWidth - POPOVER_WIDTH_PX - 8))
+                let top = rect.bottom + 8
+                popoverPos = { top, left }
+              }
+            }}
           >
-            {#if (warConflicts.summaries.overlaps === 'hard') || (warConflicts.summaries.caps === 'hard')}
-              ⚠ Critical war rules issues
-            {:else if (warConflicts.summaries.overlaps === 'soft') || (warConflicts.summaries.steamDupes === 'soft') || (association_mode === 'byServer' && !formData.character_id)}
-              ⚠ War rules warnings
-            {:else}
-              War rules (no issues)
-            {/if}
+            War Conflicts
           </button>
           {#if warningsOpen}
-            <div class="absolute z-50 mt-2 w-80 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg p-3 space-y-2">
+            <div class="fixed w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg p-3 space-y-2" style={`top:${popoverPos.top}px;left:${popoverPos.left}px`}>
               {#if checkingConflicts}
                 <div class="text-xs text-gray-500">Checking war rules…</div>
               {/if}
