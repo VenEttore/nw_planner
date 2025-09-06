@@ -159,20 +159,8 @@ class WarRulesService {
     const nearby = this.statements.getWarEventsBetween.all(fourHoursBefore, fourHoursAfter)
       .filter(e => e.id !== candidate.id)
 
-    // Overlaps: same character OR same steam account
-    const overlapping = nearby.filter(e => {
-      const w = this.buildWarWindow(e.event_time)
-      // If candidate has a character, compare by same character OR same steam
-      if (candidate.character_id) {
-        const candSteam = this._getSteamForCharacter(candidate.character_id, nearby)
-        return this.windowsOverlap(candidateWindow, w) && (
-          (e.character_id && e.character_id === candidate.character_id) ||
-          (candSteam && (e.steam_account_id || this._getSteamForCharacter(e.character_id, nearby)) === candSteam)
-        )
-      }
-      // If no character (server-only), overlaps cannot be attributed to a player; skip
-      return false
-    })
+    // Overlaps (strict): consider ONLY time and participation status; ignore identity
+    const overlapping = nearby.filter(e => this.windowsOverlap(candidateWindow, this.buildWarWindow(e.event_time)))
 
     // Severity for overlaps considers both candidate and overlapping events
     const overlapSeverity = this.summarizeSeverity([candidate, ...overlapping], statusesCache)
@@ -186,7 +174,6 @@ class WarRulesService {
           const type = (e.war_type || e.war_role || 'Unspecified')
           const eSteam = e.steam_account_id || this._getSteamForCharacter(e.character_id, nearby)
           if (!eSteam) return false
-          if (!this.windowsOverlap(candidateWindow, this.buildWarWindow(e.event_time))) return false
           const eServer = this._eventServerName(e)
           return (eSteam === candidateSteam && eServer && eServer === candidate.server_name && type === candidate.war_type)
         })
