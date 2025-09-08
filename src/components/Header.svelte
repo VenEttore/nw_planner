@@ -8,8 +8,9 @@
   let statuses = []
   let upcomingEvents = []
   let refreshIntervalId = null
+  // Aggregated warnings: [{ key, title, severity: 'hard'|'soft', events: [{id,name,time,server,warType}] }]
   let warnings = []
-  let readWarningIds = new Set(JSON.parse(localStorage.getItem('nw_warning_read_ids') || '[]'))
+  let readWarningKeys = new Set(JSON.parse(localStorage.getItem('nw_warning_read_keys') || '[]'))
   let showWarningsPanel = false
   
   onMount(async () => {
@@ -63,9 +64,39 @@
       try {
         const warnStart = now.toISOString()
         const warnEnd = new Date(now.getTime() + 48 * 60 * 60 * 1000).toISOString()
-        const results = await api.getWarConflictsForRange(warnStart, warnEnd)
-        const all = results.filter(r => (r.counts?.hard || 0) > 0 || (r.counts?.soft || 0) > 0)
-        warnings = all
+        const [results, eventsInRange] = await Promise.all([
+          api.getWarConflictsForRange(warnStart, warnEnd),
+          api.getEventsForCalendar(warnStart, warnEnd)
+        ])
+        const byId = new Map(eventsInRange.map(e => [e.id, e]))
+        const overlapHard = new Set()
+        const overlapSoft = new Set()
+        const steamSoft = new Set()
+        const capsHard = new Set()
+        for (const r of results) {
+          if (r?.summaries?.overlaps === 'hard') overlapHard.add(r.event_id)
+          else if (r?.summaries?.overlaps === 'soft') overlapSoft.add(r.event_id)
+          if (r?.summaries?.steamDupes === 'soft') steamSoft.add(r.event_id)
+          if (r?.summaries?.caps === 'hard') capsHard.add(r.event_id)
+        }
+        function mapIds(set) {
+          return Array.from(set).map(id => {
+            const e = byId.get(id) || {}
+            return {
+              id,
+              name: e.name || `Event #${id}`,
+              time: e.event_time || '',
+              server: e.server_name || '',
+              warType: e.war_type || e.war_role || ''
+            }
+          })
+        }
+        const groups = []
+        if (overlapHard.size) groups.push({ key: 'overlap:hard', title: 'Overlapping confirmed wars', severity: 'hard', events: mapIds(overlapHard) })
+        if (overlapSoft.size) groups.push({ key: 'overlap:soft', title: 'Overlapping wars (one confirmed + others non-absent)', severity: 'soft', events: mapIds(overlapSoft) })
+        if (steamSoft.size) groups.push({ key: 'steamDupes:soft', title: 'Same Steam + same server + same war type (pre-slot required)', severity: 'soft', events: mapIds(steamSoft) })
+        if (capsHard.size) groups.push({ key: 'caps:hard', title: 'Daily cap reached (same war type in one day)', severity: 'hard', events: mapIds(capsHard) })
+        warnings = groups
       } catch (e) {
         warnings = []
       }
@@ -133,47 +164,44 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
           {#if warnings.length > 0}
-            <span class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{warnings.filter(w => !readWarningIds.has(w.event_id)).length}</span>
+            <span class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{warnings.filter(w => !readWarningKeys.has(w.key)).length}</span>
           {/if}
         </button>
         {#if showWarningsPanel}
-          <div class="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
+          <div class="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
             <div class="p-2 border-b border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center justify-between">
               <span>War Warnings</span>
-              <button class="text-xs text-gray-600 dark:text-gray-300 hover:underline" on:click={() => { readWarningIds = new Set(); localStorage.removeItem('nw_warning_read_ids'); showWarningsPanel = false; setTimeout(()=> showWarningsPanel = true, 0) }}>Show all</button>
+              <button class="text-xs text-gray-600 dark:text-gray-300 hover:underline" on:click={() => { readWarningKeys = new Set(); localStorage.removeItem('nw_warning_read_keys'); showWarningsPanel = false; setTimeout(()=> showWarningsPanel = true, 0) }}>Show all</button>
             </div>
             {#if warnings.length === 0}
               <div class="p-3 text-xs text-gray-600 dark:text-gray-400">No warnings in the next 48 hours.</div>
             {:else}
-              <div class="max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
-                {#each warnings as w}
+              <div class="max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
+                {#each warnings as g}
                   <div class="p-2 text-xs text-gray-700 dark:text-gray-300">
-                    <div class="flex items-center justify-between">
-                      <div class="font-medium">Event #{w.event_id}</div>
-                      {#if (w.counts?.hard || 0) > 0}
-                        <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">{w.counts.hard} hard</span>
-                      {:else if (w.counts?.soft || 0) > 0}
-                        <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">{w.counts.soft} soft</span>
+                    <div class="flex items-center justify-between mb-1">
+                      <div class="font-medium">{g.title}</div>
+                      {#if g.severity === 'hard'}
+                        <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">Hard</span>
+                      {:else}
+                        <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Soft</span>
                       {/if}
                     </div>
-                    <div class="mt-1 text-[11px] text-gray-600 dark:text-gray-400">
-                      {#if w.summaries.caps === 'hard'}Cap limit reached on day. {/if}
-                      {#if w.summaries.overlaps === 'hard'}Overlap with ≥2 Confirmed. {/if}
-                      {#if w.summaries.overlaps === 'soft'}Overlap with 1 Confirmed + others non-absent. {/if}
-                      {#if w.summaries.steamDupes === 'soft'}Same-Steam + same server + same type; pre-slot needed. {/if}
-                    </div>
-                    <div class="mt-2 flex justify-end gap-2">
-                      <button class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600" on:click={() => { if (readWarningIds.has(w.event_id)) { readWarningIds.delete(w.event_id) } else { readWarningIds.add(w.event_id) } localStorage.setItem('nw_warning_read_ids', JSON.stringify(Array.from(readWarningIds))); }}>
-                        {readWarningIds.has(w.event_id) ? 'Mark unread' : 'Mark as read'}
+                    <ul class="space-y-1">
+                      {#each g.events as ev}
+                        <li class="flex items-center justify-between">
+                          <span class="truncate mr-2">{ev.name}{ev.warType ? ` (${ev.warType})` : ''}{ev.server ? ` • ${ev.server}` : ''}</span>
+                          <span class="text-[10px] text-gray-500">{new Date(ev.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                    <div class="mt-2 flex justify-end">
+                      <button class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600" on:click={() => { if (readWarningKeys.has(g.key)) { readWarningKeys.delete(g.key) } else { readWarningKeys.add(g.key) } localStorage.setItem('nw_warning_read_keys', JSON.stringify(Array.from(readWarningKeys))); }}>
+                        {readWarningKeys.has(g.key) ? 'Mark unread' : 'Mark as read'}
                       </button>
                     </div>
                   </div>
                 {/each}
-              </div>
-              <div class="p-2 border-t border-gray-200 dark:border-gray-700 text-right">
-                <button class="text-xs text-gray-600 dark:text-gray-300 hover:underline" on:click={() => { readWarningIds = new Set(); localStorage.removeItem('nw_warning_read_ids'); }}>
-                  Mark all unread
-                </button>
               </div>
             {/if}
           </div>
