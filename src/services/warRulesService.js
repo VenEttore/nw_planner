@@ -175,13 +175,17 @@ class WarRulesService {
           const eSteam = e.steam_account_id || this._getSteamForCharacter(e.character_id, nearby)
           if (!eSteam) return false
           const eServer = this._eventServerName(e)
+          // Only consider different characters (pre-slot applies when 2+ characters on same Steam)
+          if (e.character_id && candidate.character_id && e.character_id === candidate.character_id) return false
           return (eSteam === candidateSteam && eServer && eServer === candidate.server_name && type === candidate.war_type)
         })
       }
     }
     const steamParticipants = [candidate, ...steamDupes]
     const steamNonAbsent = steamParticipants.filter(e => !this.isStatusAbsent(e.participation_status, statusesCache))
-    const steamSeverity = steamDupes.length > 0 && steamNonAbsent.length >= 2 ? 'soft' : 'none'
+    // Require at least two distinct non-absent characters to trigger pre-slot warning
+    const distinctChars = new Set(steamNonAbsent.map(e => e.character_id).filter(Boolean))
+    const steamSeverity = steamDupes.length > 0 && steamNonAbsent.length >= 2 && distinctChars.size >= 2 ? 'soft' : 'none'
 
     // Caps: per character per war day per type
     let caps = []
