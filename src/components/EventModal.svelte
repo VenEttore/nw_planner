@@ -145,11 +145,14 @@
   // Load servers when shown
   async function loadServers(){
     try { servers = await api.getActiveServers() } catch (_) { servers = [] }
-    // Ensure current event's server appears even if inactive or not in active list
+    // Ensure the current event's server appears even if inactive or not in the active list
     try {
       const current = formData?.server_name || editingEvent?.server_name
       if (current && !servers.some(s => s.name === current)) {
-        servers = [...servers, { name: current, region: 'Unknown', timezone: formData?.timezone || editingEvent?.timezone || '' }]
+        servers = [
+          ...servers,
+          { name: current, region: 'Unknown', timezone: formData?.timezone || editingEvent?.timezone || '' }
+        ]
       }
     } catch {}
   }
@@ -651,7 +654,7 @@
         {#if formData.event_type === 'War'}
         <!-- War rules warnings popover -->
         <div class="relative z-[1100]">
-          <button bind:this={warnBtnEl} type="button" class="text-xs px-2 py-1 border rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 relative"
+          <button bind:this={warnBtnEl} type="button" class="text-xs px-2 py-1 border rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
             on:click={() => {
               warningsOpen = !warningsOpen
               if (warningsOpen && warnBtnEl) {
@@ -663,9 +666,6 @@
             }}
           >
             War Conflicts
-            {#if (association_mode === 'byServer' && !formData.character_id) || warConflicts.summaries.caps !== 'none' || warConflicts.summaries.overlaps !== 'none' || warConflicts.summaries.steamDupes !== 'none'}
-              <span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500"></span>
-            {/if}
           </button>
           {#if warningsOpen}
             <div class="fixed w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg p-3 space-y-2" style={`top:${popoverPos.top}px;left:${popoverPos.left}px`}>
@@ -709,7 +709,7 @@
             >
               <option value="">Select server</option>
               {#each servers as s}
-                <option value={s.name}>{s.name} ({s.region})</option>
+                <option value={s.name} selected={formData.server_name===s.name}>{s.name} ({s.region})</option>
               {/each}
             </select>
             {#if errors.server_name}

@@ -33,9 +33,7 @@ class EventService {
                 WHERE id = ?
             `),
             deleteEvent: await this.db.prepare('DELETE FROM events WHERE id = ?'),
-            getEventById: await this.db.prepare(`
-                SELECT e.* FROM events e WHERE e.id = ?
-            `),
+            getEventById: await this.db.prepare('SELECT * FROM events WHERE id = ?'),
             getAllEvents: await this.db.prepare('SELECT * FROM events ORDER BY event_time ASC'),
             getEventsByCharacter: await this.db.prepare('SELECT * FROM events WHERE character_id = ? ORDER BY event_time ASC'),
             getEventsByServer: await this.db.prepare('SELECT * FROM events WHERE server_name = ? ORDER BY event_time ASC'),
