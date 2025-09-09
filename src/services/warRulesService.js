@@ -187,7 +187,7 @@ class WarRulesService {
     const distinctChars = new Set(steamNonAbsent.map(e => e.character_id).filter(Boolean))
     const steamSeverity = steamDupes.length > 0 && steamNonAbsent.length >= 2 && distinctChars.size >= 2 ? 'soft' : 'none'
 
-    // Caps: per character per war day per type
+    // Caps: per character per war day per type, consider participation statuses
     let caps = []
     let capSeverity = 'none'
     if (candidate.character_id && (candidate.war_type === 'Attack' || candidate.war_type === 'Defense')) {
@@ -202,7 +202,13 @@ class WarRulesService {
       })
       if (sameTypeSameDay.length >= 1) {
         caps = sameTypeSameDay
-        capSeverity = 'hard'
+        const involved = [candidate, ...sameTypeSameDay]
+        const confirmedCount = involved.filter(e => e.participation_status === 'Confirmed').length
+        const nonAbsentCount = involved.filter(e => !this.isStatusAbsent(e.participation_status, statusesCache)).length
+        if (confirmedCount >= 2) capSeverity = 'hard'
+        else if (confirmedCount === 1 && nonAbsentCount >= 2) capSeverity = 'soft'
+        else capSeverity = 'none'
+        if (capSeverity === 'none') caps = []
       }
     }
 
@@ -253,7 +259,7 @@ class WarRulesService {
       }
       const conflicts = await this.getWarConflictsForEvent(dto)
       const hardCount = (conflicts.summaries.caps === 'hard' ? 1 : 0) + (conflicts.summaries.overlaps === 'hard' ? 1 : 0)
-      const softCount = (conflicts.summaries.steamDupes === 'soft' ? 1 : 0) + (conflicts.summaries.overlaps === 'soft' ? 1 : 0)
+      const softCount = (conflicts.summaries.steamDupes === 'soft' ? 1 : 0) + (conflicts.summaries.overlaps === 'soft' ? 1 : 0) + (conflicts.summaries.caps === 'soft' ? 1 : 0)
       results.push({
         event_id: ev.id,
         caps: conflicts.caps.map(c => c.id),
