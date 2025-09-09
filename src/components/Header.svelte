@@ -96,6 +96,8 @@
         if (overlapSoft.size) groups.push({ key: 'overlap:soft', title: 'Overlapping wars (one confirmed + others non-absent)', severity: 'soft', events: mapIds(overlapSoft) })
         if (steamSoft.size) groups.push({ key: 'steamDupes:soft', title: 'Same Steam + same server + same war type (pre-slot required)', severity: 'soft', events: mapIds(steamSoft) })
         if (capsHard.size) groups.push({ key: 'caps:hard', title: 'Daily cap reached (same war type in one day)', severity: 'hard', events: mapIds(capsHard) })
+        const capsSoft = new Set(results.filter(r => r?.summaries?.caps === 'soft').map(r => r.event_id))
+        if (capsSoft.size) groups.push({ key: 'caps:soft', title: 'Daily cap warning (one confirmed + others non-absent)', severity: 'soft', events: mapIds(capsSoft) })
         warnings = groups
       } catch (e) {
         warnings = []

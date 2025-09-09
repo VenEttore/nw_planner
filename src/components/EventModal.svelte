@@ -664,6 +664,9 @@
               {#if (warConflicts.summaries.caps === 'hard')}
                 <div class="text-sm text-red-700">Daily cap reached: this character already has a {formData.war_role} on this war day.</div>
               {/if}
+              {#if (warConflicts.summaries.caps === 'soft')}
+                <div class="text-sm text-amber-700">Daily cap warning: one Confirmed and at least one other non-absent {formData.war_role} on this war day.</div>
+              {/if}
               {#if warConflicts.steamDupes.length > 0}
                 <div class="text-sm text-amber-700">Same Steam, same server, same war type detected across characters. Pre-slotting is required in-game.</div>
               {/if}
