@@ -659,7 +659,7 @@
                 <div class="text-xs text-gray-500">Checking war rules…</div>
               {/if}
               {#if association_mode === 'byServer' && !formData.character_id}
-                <div class="text-xs text-amber-700">When you choose a character, verify daily limits (1 Attack + 1 Defense) and pre-slots if you use multiple characters on the same Steam account.</div>
+                <div class="text-xs text-amber-700">Server-only: after selecting a character, verify daily limits (1 Attack + 1 Defense) and pre-slots for same-Steam same-server same-type.</div>
               {/if}
               {#if (warConflicts.summaries.caps === 'hard')}
                 <div class="text-sm text-red-700">Daily cap reached: this character already has a {formData.war_role} on this war day.</div>

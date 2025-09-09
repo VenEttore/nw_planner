@@ -98,6 +98,11 @@
         if (capsHard.size) groups.push({ key: 'caps:hard', title: 'Daily cap reached (same war type in one day)', severity: 'hard', events: mapIds(capsHard) })
         const capsSoft = new Set(results.filter(r => r?.summaries?.caps === 'soft').map(r => r.event_id))
         if (capsSoft.size) groups.push({ key: 'caps:soft', title: 'Daily cap warning (one confirmed + others non-absent)', severity: 'soft', events: mapIds(capsSoft) })
+        // Server-only association reminder (no character yet, but associated by server)
+        try {
+          const serverOnlyIds = new Set(eventsInRange.filter(e => e.event_type === 'War' && (!e.character_id || e.character_id === null) && e.server_name).map(e => e.id))
+          if (serverOnlyIds.size) groups.push({ key: 'serverOnly:soft', title: 'Server-only wars: verify limits and pre-slots after choosing a character', severity: 'soft', events: mapIds(serverOnlyIds) })
+        } catch {}
         warnings = groups
       } catch (e) {
         warnings = []
