@@ -389,6 +389,10 @@
       if (server) {
         formData.server_name = server.name
         formData.timezone = server.timezone || formData.timezone
+      } else if (formData.server_name && !formData.timezone) {
+        // Resolve timezone from servers list if available
+        const resolvedTz = (servers.find(s => s.name === formData.server_name) || {}).timezone
+        if (resolvedTz) formData.timezone = resolvedTz
       }
       formData.character_id = null
     } else {
