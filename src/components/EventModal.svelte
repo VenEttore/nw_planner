@@ -145,16 +145,6 @@
   // Load servers when shown
   async function loadServers(){
     try { servers = await api.getActiveServers() } catch (_) { servers = [] }
-    // Ensure the current event's server appears even if inactive or not in the active list
-    try {
-      const current = formData?.server_name || editingEvent?.server_name
-      if (current && !servers.some(s => s.name === current)) {
-        servers = [
-          ...servers,
-          { name: current, region: 'Unknown', timezone: formData?.timezone || editingEvent?.timezone || '' }
-        ]
-      }
-    } catch {}
   }
   $: if (show) { (async ()=>{ await loadServers() })() }
 
@@ -399,10 +389,6 @@
       if (server) {
         formData.server_name = server.name
         formData.timezone = server.timezone || formData.timezone
-      } else if (formData.server_name && !formData.timezone) {
-        // Resolve timezone from servers list if available
-        const resolvedTz = (servers.find(s => s.name === formData.server_name) || {}).timezone
-        if (resolvedTz) formData.timezone = resolvedTz
       }
       formData.character_id = null
     } else {
@@ -709,7 +695,7 @@
             >
               <option value="">Select server</option>
               {#each servers as s}
-                <option value={s.name} selected={formData.server_name===s.name}>{s.name} ({s.region})</option>
+                <option value={s.name}>{s.name} ({s.region})</option>
               {/each}
             </select>
             {#if errors.server_name}

@@ -7,14 +7,6 @@ class EventService {
         this.statements = {}
     }
 
-    resolveServerTimezone(serverName) {
-        if (!serverName) return null
-        try {
-            const row = this.db.db.prepare('SELECT timezone FROM servers WHERE name = ?').get(serverName)
-            return row?.timezone || null
-        } catch (_) { return null }
-    }
-
     async initStatements() {
         if (this.statementsInitialized) return
         
@@ -63,8 +55,7 @@ class EventService {
                 SELECT 
                     e.*,
                     c.name as character_name,
-                    c.faction,
-                    COALESCE(e.server_name, c.server_name) as server_name
+                    c.faction
                 FROM events e
                 LEFT JOIN characters c ON e.character_id = c.id
                 WHERE datetime(event_time) >= datetime(?)
@@ -125,14 +116,13 @@ class EventService {
         
         const effectiveWarType = (war_type || war_role || 'Unspecified')
 
-        const tzToUse = timezone || this.resolveServerTimezone(server_name) || 'UTC'
         const result = this.statements.insertEvent.run(
             name,
             description || null,
             event_type,
             server_name || null,
             event_time,
-            tzToUse,
+            timezone || 'UTC',
             character_id || null,
             participation_status || 'Signed Up',
             location || null,
@@ -171,14 +161,13 @@ class EventService {
         
         const effectiveWarType = (war_type || war_role || 'Unspecified')
 
-        const tzToUseUpd = timezone || this.resolveServerTimezone(server_name) || 'UTC'
         const result = this.statements.updateEvent.run(
             name,
             description || null,
             event_type,
             server_name || null,
             event_time,
-            tzToUseUpd,
+            timezone || 'UTC',
             character_id || null,
             participation_status || 'Signed Up',
             location || null,
