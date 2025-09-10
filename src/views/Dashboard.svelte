@@ -242,6 +242,25 @@
     return null
   }
 
+  function conflictMessagesFor(ev) {
+    const sum = conflictSummaries.get(ev.id)
+    if (!sum) return []
+    const msgs = []
+    const wt = ev.war_type || ev.war_role || 'War'
+    if (sum.summaries?.overlaps === 'hard' || sum.summaries?.overlaps === 'soft') {
+      msgs.push('Time Conflict — Conflicting war times detected.')
+    }
+    if (sum.summaries?.steamDupes === 'soft') {
+      msgs.push('Steam Account Conflict — Pre-slot required for same type and server on the same Steam account.')
+    }
+    if (sum.summaries?.caps === 'hard') {
+      msgs.push(`War Limit Reached — ${wt} limit reached for this character.`)
+    } else if (sum.summaries?.caps === 'soft') {
+      msgs.push(`War Limit Reached — Warning: ${wt} limit will be reached for this character.`)
+    }
+    return msgs
+  }
+
   async function startResetTimers() {
     // Start timers for all unique servers from active characters
     if (selectedCharacterServers.length > 0) {
@@ -410,13 +429,22 @@
                 <div class="p-2 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" role="button" tabindex="0" on:click={() => openEditEvent(event)} on:keydown={(e)=> (e.key==='Enter'||e.key===' ') && openEditEvent(event)}>
                   <div class="flex items-start justify-between">
                     <div class="flex-1">
-                      <div class="flex items-center gap-2">
+                      <div class="flex items-center gap-2 relative group">
                         <span class="font-medium text-gray-900 dark:text-white text-sm">{event.name}</span>
                         <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{eventTypeWithWar(event)}</span>
                         {#if conflictBadgeFor(event)}
-                          <button class="sr-only focus:not-sr-only focus:outline-none text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200" on:click={() => openEditEvent(event)} title="View war conflicts">
-                            {conflictBadgeFor(event).text}
-                          </button>
+                          <div class="absolute -top-1 -right-1" role="presentation">
+                            <button class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="View war alerts" title="View war alerts" on:click|stopPropagation>
+                              <svg class="w-4 h-4 text-amber-600" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" d="M18 8a8 8 0 11-16 0 8 8 0 0116 0zm-9 4a1 1 0 102 0 1 1 0 00-2 0zm1-7a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                              </svg>
+                            </button>
+                            <div class="pointer-events-none absolute right-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg p-2 text-[11px] text-gray-700 dark:text-gray-300 hidden group-hover:block">
+                              {#each conflictMessagesFor(event) as m}
+                                <div class="py-1">{m}</div>
+                              {/each}
+                            </div>
+                          </div>
                         {/if}
                       </div>
                       <div class="text-xs text-gray-600 dark:text-gray-400 mt-0.5">

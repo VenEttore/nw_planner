@@ -41,7 +41,7 @@
   let servers = []
   let association_mode = 'byCharacter' // 'byCharacter' | 'byServer' | 'none'
   $: canUseServerTime = (association_mode === 'byCharacter' && !!formData.character_id) || (association_mode === 'byServer' && !!formData.server_name)
-  // War rules conflicts
+  // War rules conflicts (disabled in modal UI)
   let warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
   let checkingConflicts = false
   let warningsOpen = false
@@ -148,49 +148,15 @@
   }
   $: if (show) { (async ()=>{ await loadServers() })() }
 
-  // Debounced conflict check
+  // Debounced conflict check (disabled)
   let conflictTimer
   function scheduleConflictCheck() {
-    if (!show) return
-    if (conflictTimer) clearTimeout(conflictTimer)
-    conflictTimer = setTimeout(runConflictCheck, 200)
+    // no-op: conflicts are no longer shown in the modal
   }
   async function runConflictCheck() {
-    if (!show) return
-    if (formData.event_type !== 'War') { warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }; return }
-    if (!formData.event_time) { warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }; return }
-    checkingConflicts = true
-    try {
-      // Determine effective timezone like submit does
-      let effectiveTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      if (timeMode === 'server') {
-        if (association_mode === 'byCharacter') {
-          const character = characters.find(c => c.id === parseInt(formData.character_id))
-          effectiveTimezone = character?.server_timezone || formData.timezone || effectiveTimezone
-        } else if (association_mode === 'byServer') {
-          const server = servers.find(s => s.name === formData.server_name)
-          effectiveTimezone = server?.timezone || formData.timezone || effectiveTimezone
-        }
-      } else {
-        effectiveTimezone = formData.timezone || effectiveTimezone
-      }
-      const dto = {
-        id: editingEvent?.id,
-        event_type: 'War',
-        war_type: formData.war_role,
-        character_id: association_mode === 'byCharacter' ? (formData.character_id ? parseInt(formData.character_id) : null) : null,
-        server_name: association_mode === 'byServer' ? (formData.server_name || '') : (characters.find(c => c.id === parseInt(formData.character_id))?.server_name || formData.server_name || ''),
-        event_time: timeMode === 'server' ? new Date(zonedTimeToUtc(formData.event_time, effectiveTimezone)).toISOString() : new Date(formData.event_time).toISOString(),
-        timezone: effectiveTimezone,
-        participation_status: formData.participation_status
-      }
-      warConflicts = await api.getWarConflictsForEvent(dto)
-    } catch (e) {
-      console.error('War conflict check failed:', e)
-      warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
-    } finally {
-      checkingConflicts = false
-    }
+    // no-op
+    warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
+    checkingConflicts = false
   }
 
   // Auto-apply initial template if provided on first show
@@ -511,8 +477,9 @@
 <svelte:window on:keydown={handleKeydown} />
 
 {#if show}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" on:mousedown={onBackdropMouseDown} on:click={handleBackdropClick} on:keydown={handleKeydown}>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" role="document" on:click|stopPropagation on:keydown|stopPropagation>
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 relative" role="dialog" aria-modal="true">
+    <button class="absolute inset-0 z-0" aria-label="Close modal backdrop" on:click={handleBackdropClick} on:keydown={(e)=>{ if (e.key==='Enter' || e.key===' ') { handleBackdropClick(e) } }}></button>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative z-10" role="document">
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
@@ -638,49 +605,7 @@
         </div>
 
         {#if formData.event_type === 'War'}
-        <!-- War rules warnings popover -->
-        <div class="relative z-[1100]">
-          <button bind:this={warnBtnEl} type="button" class="text-xs px-2 py-1 border rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-            on:click={() => {
-              warningsOpen = !warningsOpen
-              if (warningsOpen && warnBtnEl) {
-                const rect = warnBtnEl.getBoundingClientRect()
-                let left = Math.min(Math.max(8, rect.left), (window.innerWidth - POPOVER_WIDTH_PX - 8))
-                let top = rect.bottom + 8
-                popoverPos = { top, left }
-              }
-            }}
-          >
-            War Conflicts
-          </button>
-          {#if warningsOpen}
-            <div class="fixed w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg p-3 space-y-2" style={`top:${popoverPos.top}px;left:${popoverPos.left}px`}>
-              {#if checkingConflicts}
-                <div class="text-xs text-gray-500">Checking war rules…</div>
-              {/if}
-              {#if association_mode === 'byServer' && !formData.character_id}
-                <div class="text-xs text-amber-700">Server-only: after selecting a character, verify daily limits (1 Attack + 1 Defense) and pre-slots for same-Steam same-server same-type.</div>
-              {/if}
-              {#if (warConflicts.summaries.caps === 'hard')}
-                <div class="text-sm text-red-700">Daily cap reached: this character already has a {formData.war_role} on this war day.</div>
-              {/if}
-              {#if (warConflicts.summaries.caps === 'soft')}
-                <div class="text-sm text-amber-700">Daily cap warning: one Confirmed and at least one other non-absent {formData.war_role} on this war day.</div>
-              {/if}
-              {#if warConflicts.steamDupes.length > 0}
-                <div class="text-sm text-amber-700">Same Steam, same server, same war type detected across characters. Pre-slotting is required in-game.</div>
-              {/if}
-              {#if warConflicts.summaries.overlaps === 'soft'}
-                <div class="text-sm text-amber-700">Time overlap: one Confirmed war conflicts with another non-absent war.</div>
-              {:else if warConflicts.summaries.overlaps === 'hard'}
-                <div class="text-sm text-red-700">Time overlap: two or more Confirmed wars conflict in time.</div>
-              {/if}
-              {#if (warConflicts.summaries.caps !== 'hard') && warConflicts.steamDupes.length === 0 && warConflicts.summaries.overlaps === 'none' && !(association_mode === 'byServer' && !formData.character_id)}
-                <div class="text-xs text-gray-600 dark:text-gray-300">No issues detected.</div>
-              {/if}
-            </div>
-          {/if}
-        </div>
+        <!-- War rules warnings are intentionally omitted from the modal UI -->
         {/if}
           {:else if association_mode === 'byServer'}
           <div class="md:col-span-2">

@@ -193,6 +193,25 @@
     if (soft > 0) return { kind: 'soft', text: `War Conflicts` }
     return null
   }
+
+  function conflictMessagesFor(ev) {
+    const sum = conflictSummaries.get(ev.id)
+    if (!sum) return []
+    const msgs = []
+    const wt = ev.war_type || ev.war_role || 'War'
+    if (sum.summaries?.overlaps === 'hard' || sum.summaries?.overlaps === 'soft') {
+      msgs.push('Time Conflict — Conflicting war times detected.')
+    }
+    if (sum.summaries?.steamDupes === 'soft') {
+      msgs.push('Steam Account Conflict — Pre-slot required for same type and server on the same Steam account.')
+    }
+    if (sum.summaries?.caps === 'hard') {
+      msgs.push(`War Limit Reached — ${wt} limit reached for this character.`)
+    } else if (sum.summaries?.caps === 'soft') {
+      msgs.push(`War Limit Reached — Warning: ${wt} limit will be reached for this character.`)
+    }
+    return msgs
+  }
 </script>
 
 <div class="max-w-7xl mx-auto">
@@ -255,15 +274,24 @@
             <div class="flex items-start justify-between gap-3">
               <div class="flex-1">
                 <!-- Event Header -->
-                <div class="flex items-center gap-2 mb-1">
+                <div class="flex items-center gap-2 mb-1 relative">
                   <h3 class="text-base font-semibold text-gray-900 dark:text-white">{event.name}</h3>
                   <span class="text-xs px-2 py-1 rounded-full {getEventTypeColor(event.event_type)}">
                     {eventTypeWithWar(event)}
                   </span>
                   {#if conflictBadgeFor(event)}
-                    <button class="sr-only focus:not-sr-only focus:outline-none text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200" on:click={() => openEdit(event)} title="View war conflicts">
-                      {conflictBadgeFor(event).text}
-                    </button>
+                    <div class="absolute -top-1 -right-1" role="presentation">
+                      <button class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="View war alerts" title="View war alerts" on:click|stopPropagation>
+                        <svg class="w-4 h-4 text-amber-600" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                          <path fill-rule="evenodd" d="M18 8a8 8 0 11-16 0 8 8 0 0116 0zm-9 4a1 1 0 102 0 1 1 0 00-2 0zm1-7a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                      </button>
+                      <div class="pointer-events-none absolute right-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg p-2 text-xs text-gray-700 dark:text-gray-300 hidden group-hover:block">
+                        {#each conflictMessagesFor(event) as m}
+                          <div class="py-1">{m}</div>
+                        {/each}
+                      </div>
+                    </div>
                   {/if}
                 </div>
                 
