@@ -165,7 +165,7 @@
         <button
           class="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors relative"
           on:click={() => showWarningsPanel = !showWarningsPanel}
-          title="War warnings"
+          title="War alerts"
         >
           <svg class="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -177,11 +177,11 @@
         {#if showWarningsPanel}
           <div class="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
             <div class="p-2 border-b border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center justify-between">
-              <span>War Warnings</span>
+              <span>War Alerts</span>
               <button class="text-xs text-gray-600 dark:text-gray-300 hover:underline" on:click={() => { readWarningKeys = new Set(); localStorage.removeItem('nw_warning_read_keys'); showWarningsPanel = false; setTimeout(()=> showWarningsPanel = true, 0) }}>Show all</button>
             </div>
             {#if warnings.length === 0}
-              <div class="p-3 text-xs text-gray-600 dark:text-gray-400">No warnings in the next 48 hours.</div>
+              <div class="p-3 text-xs text-gray-600 dark:text-gray-400">No alerts in the next 48 hours.</div>
             {:else}
               <div class="max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
                 {#each warnings as g}
@@ -189,9 +189,9 @@
                     <div class="flex items-center justify-between mb-1">
                       <div class="font-medium">{g.title}</div>
                       {#if g.severity === 'hard'}
-                        <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">Hard</span>
+                        <span class="px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-200">Conflict</span>
                       {:else}
-                        <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Soft</span>
+                        <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Warning</span>
                       {/if}
                     </div>
                     <ul class="space-y-1">
