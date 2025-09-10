@@ -87,21 +87,64 @@
               name: e.name || `Event #${id}`,
               time: e.event_time || '',
               server: e.server_name || '',
-              warType: e.war_type || e.war_role || ''
+              warType: e.war_type || e.war_role || '',
+              character: e.character_name || ''
             }
           })
         }
         const groups = []
-        if (overlapHard.size) groups.push({ key: 'overlap:hard', title: 'Overlapping confirmed wars', severity: 'hard', events: mapIds(overlapHard) })
-        if (overlapSoft.size) groups.push({ key: 'overlap:soft', title: 'Overlapping wars (one confirmed + others non-absent)', severity: 'soft', events: mapIds(overlapSoft) })
-        if (steamSoft.size) groups.push({ key: 'steamDupes:soft', title: 'Same Steam + same server + same war type (pre-slot required)', severity: 'soft', events: mapIds(steamSoft) })
-        if (capsHard.size) groups.push({ key: 'caps:hard', title: 'Daily cap reached (same war type in one day)', severity: 'hard', events: mapIds(capsHard) })
+        if (overlapHard.size) groups.push({
+          key: 'overlap:hard',
+          title: 'Time Conflict',
+          description: 'Conflicting war times detected.',
+          severity: 'hard',
+          events: mapIds(overlapHard)
+        })
+        if (overlapSoft.size) groups.push({
+          key: 'overlap:soft',
+          title: 'Time Conflict',
+          description: 'Conflicting war times detected.',
+          severity: 'soft',
+          events: mapIds(overlapSoft)
+        })
+        if (steamSoft.size) groups.push({
+          key: 'steamDupes:soft',
+          title: 'Steam Account Conflict',
+          description: 'Pre-slot required for wars of the same type and server using characters on the same Steam account.',
+          severity: 'soft',
+          events: mapIds(steamSoft)
+        })
+        if (capsHard.size) {
+          const evs = mapIds(capsHard)
+          const first = evs[0] || {}
+          const wt = first.warType || 'War'
+          const ch = first.character || 'this character'
+          groups.push({
+            key: 'caps:hard',
+            title: 'War Limit Reached',
+            description: `${wt} limit reached for ${ch}.`,
+            severity: 'hard',
+            events: evs
+          })
+        }
         const capsSoft = new Set(results.filter(r => r?.summaries?.caps === 'soft').map(r => r.event_id))
-        if (capsSoft.size) groups.push({ key: 'caps:soft', title: 'Daily cap warning (one confirmed + others non-absent)', severity: 'soft', events: mapIds(capsSoft) })
+        if (capsSoft.size) {
+          const evs = mapIds(capsSoft)
+          const first = evs[0] || {}
+          const wt = first.warType || 'War'
+          const ch = first.character || 'this character'
+          groups.push({
+            key: 'caps:soft',
+            title: 'War Limit Reached',
+            description: `Warning: ${wt} limit will be reached for ${ch}.`,
+            severity: 'soft',
+            events: evs
+          })
+        }
         // Server-only association reminder (no character yet, but associated by server)
         try {
           const serverOnlyIds = new Set(eventsInRange.filter(e => e.event_type === 'War' && (!e.character_id || e.character_id === null) && e.server_name).map(e => e.id))
-          if (serverOnlyIds.size) groups.push({ key: 'serverOnly:soft', title: 'Server-only wars: verify limits and pre-slots after choosing a character', severity: 'soft', events: mapIds(serverOnlyIds) })
+          if (serverOnlyIds.size) groups.push({ key: 'serverOnly:soft', title: 'Server-only wars', description: 'Reminder: verify daily limits and pre-slots when using a merc/fly-in account.', severity: 'soft', events: mapIds(serverOnlyIds) })
         } catch {}
         warnings = groups
       } catch (e) {
@@ -194,6 +237,9 @@
                         <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Warning</span>
                       {/if}
                     </div>
+                    {#if g.description}
+                      <div class="mb-1 text-[11px] text-gray-600 dark:text-gray-400">{g.description}</div>
+                    {/if}
                     <ul class="space-y-1">
                       {#each g.events as ev}
                         <li class="flex items-center justify-between">
