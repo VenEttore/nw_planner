@@ -41,13 +41,6 @@
   let servers = []
   let association_mode = 'byCharacter' // 'byCharacter' | 'byServer' | 'none'
   $: canUseServerTime = (association_mode === 'byCharacter' && !!formData.character_id) || (association_mode === 'byServer' && !!formData.server_name)
-  // War rules conflicts (disabled in modal UI)
-  let warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
-  let checkingConflicts = false
-  let warningsOpen = false
-  let warnBtnEl
-  let popoverPos = { top: 0, left: 0 }
-  const POPOVER_WIDTH_PX = 320 // matches w-80 (20rem)
   
   // Event types
   const eventTypes = [
@@ -148,16 +141,7 @@
   }
   $: if (show) { (async ()=>{ await loadServers() })() }
 
-  // Debounced conflict check (disabled)
-  let conflictTimer
-  function scheduleConflictCheck() {
-    // no-op: conflicts are no longer shown in the modal
-  }
-  async function runConflictCheck() {
-    // no-op
-    warConflicts = { caps: [], steamDupes: [], overlaps: [], summaries: { caps: 'none', steamDupes: 'none', overlaps: 'none' } }
-    checkingConflicts = false
-  }
+  // War conflicts checks removed from modal; header and other surfaces handle alerts
 
   // Auto-apply initial template if provided on first show
   let appliedInitial = false
@@ -418,7 +402,6 @@
   // Auto-populate server name when character changes
   function handleCharacterChange() {
     syncServerFromCharacter()
-    scheduleConflictCheck()
   }
 
   function handleServerChange(e) {
@@ -428,7 +411,6 @@
       formData.server_name = server.name
       formData.timezone = server.timezone || formData.timezone
     }
-    scheduleConflictCheck()
   }
   
   // Get event type specific defaults
@@ -470,16 +452,16 @@
   $: if (show) {
     // key fields that impact conflicts
     const keyTuple = [formData.event_type, formData.war_role, formData.character_id, formData.server_name, formData.event_time, timeMode, association_mode, formData.participation_status]
-    keyTuple, scheduleConflictCheck()
+    keyTuple
   }
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
 
 {#if show}
-  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 relative" role="dialog" aria-modal="true">
-    <button class="absolute inset-0 z-0" aria-label="Close modal backdrop" on:click={handleBackdropClick} on:keydown={(e)=>{ if (e.key==='Enter' || e.key===' ') { handleBackdropClick(e) } }}></button>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative z-10" role="document">
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+    <button class="absolute inset-0 w-full h-full bg-transparent" aria-label="Close modal backdrop" on:mousedown={onBackdropMouseDown} on:click={handleBackdropClick}></button>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative" role="document">
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
@@ -604,9 +586,7 @@
             {/if}
         </div>
 
-        {#if formData.event_type === 'War'}
-        <!-- War rules warnings are intentionally omitted from the modal UI -->
-        {/if}
+        
           {:else if association_mode === 'byServer'}
           <div class="md:col-span-2">
             <label for="server_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Server *</label>
