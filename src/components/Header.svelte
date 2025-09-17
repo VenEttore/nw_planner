@@ -103,8 +103,8 @@
                       {/each}
                     </ul>
                     <div class="mt-2 flex justify-end">
-                      <button class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600" on:click={() => { if (readSet.has(g.key)) { markGroupUnread(g.key) } else { markGroupRead(g.key) } }}>
-                        {readSet.has(g.key) ? 'Mark unread' : 'Mark as read'}
+                      <button class="text-[11px] px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600" on:click={() => { if (readSet.has(g.fqKey)) { markGroupUnread(g.fqKey) } else { markGroupRead(g.fqKey) } }}>
+                        {readSet.has(g.fqKey) ? 'Mark unread' : 'Mark as read'}
                       </button>
                     </div>
                   </div>

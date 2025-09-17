@@ -25,7 +25,8 @@ function persistReadKeys(set) {
 
 // Group shape
 // {
-//   key: string,                // stable identifier (e.g., 'overlap:hard')
+//   key: string,                // stable identifier within a source (e.g., 'overlap:hard')
+//   fqKey: string,              // fully-qualified key `${source}:${key}` used for read/unread
 //   title: string,
 //   description?: string,
 //   severity: 'hard'|'soft',
@@ -44,12 +45,12 @@ const groupsStore = writable([])
 export const allNotifications = groupsStore
 
 export const unreadCount = derived([groupsStore, readKeysStore], ([$groups, $read]) => {
-  return ($groups || []).reduce((acc, g) => acc + ($read.has(g.key) ? 0 : 1), 0)
+  return ($groups || []).reduce((acc, g) => acc + ($read.has(g.fqKey) ? 0 : 1), 0)
 })
 
 // Convenience channel slice for war alerts
 export const warAlerts = derived(groupsStore, ($groups) => ($groups || []).filter(g => g.source === 'war'))
-export const warUnreadCount = derived([warAlerts, readKeysStore], ([$war, $read]) => ($war || []).reduce((acc, g) => acc + ($read.has(g.key) ? 0 : 1), 0))
+export const warUnreadCount = derived([warAlerts, readKeysStore], ([$war, $read]) => ($war || []).reduce((acc, g) => acc + ($read.has(g.fqKey) ? 0 : 1), 0))
 
 export const readKeys = derived(readKeysStore, ($s) => $s)
 
@@ -58,26 +59,26 @@ export function replaceSourceGroups(source, newGroups) {
   groupsStore.update((current) => {
     const rest = (current || []).filter(g => g.source !== source)
     // Normalize incoming groups
-    const normalized = (newGroups || []).map(g => ({
-      ...g,
-      source,
-    }))
+    const normalized = (newGroups || []).map(g => {
+      const fqKey = `${source}:${g.key}`
+      return { ...g, source, fqKey }
+    })
     return [...rest, ...normalized]
   })
 }
 
-export function markGroupRead(key) {
-  if (!key) return
+export function markGroupRead(fqKey) {
+  if (!fqKey) return
   const next = new Set(get(readKeysStore))
-  next.add(key)
+  next.add(fqKey)
   readKeysStore.set(next)
   persistReadKeys(next)
 }
 
-export function markGroupUnread(key) {
-  if (!key) return
+export function markGroupUnread(fqKey) {
+  if (!fqKey) return
   const next = new Set(get(readKeysStore))
-  next.delete(key)
+  next.delete(fqKey)
   readKeysStore.set(next)
   persistReadKeys(next)
 }
