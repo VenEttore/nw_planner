@@ -434,7 +434,7 @@
                         <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">{eventTypeWithWar(event)}</span>
                         {#if conflictBadgeFor(event)}
                           <div class="absolute -top-1 -right-1" role="presentation">
-                            <button class="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="View war alerts" title="View war alerts" on:click|stopPropagation>
+                            <button class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700" aria-label="View war alerts" title="View war alerts" on:click|stopPropagation>
                               <svg class="w-4 h-4 text-amber-600" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                                 <path fill-rule="evenodd" d="M18 8a8 8 0 11-16 0 8 8 0 0116 0zm-9 4a1 1 0 102 0 1 1 0 00-2 0zm1-7a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                               </svg>
