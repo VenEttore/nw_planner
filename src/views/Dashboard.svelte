@@ -439,7 +439,7 @@
                                 <path fill-rule="evenodd" d="M18 8a8 8 0 11-16 0 8 8 0 0116 0zm-9 4a1 1 0 102 0 1 1 0 00-2 0zm1-7a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                               </svg>
                             </button>
-                            <div class="pointer-events-none absolute right-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg p-2 text-[11px] text-gray-700 dark:text-gray-300 hidden group-hover:block">
+                            <div class="pointer-events-none absolute right-0 mt-1 w-72 z-[1100] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg p-2 text-[11px] text-gray-700 dark:text-gray-300 hidden group-hover:block">
                               {#each conflictMessagesFor(event) as m}
                                 <div class="py-1">{m}</div>
                               {/each}
